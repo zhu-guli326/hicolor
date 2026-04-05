@@ -1,3 +1,10 @@
+# 重要：仓库根目录的 index.html 是开发用（引用 /src/main.tsx），不会出现在线上。
+# 线上必须部署 npm run build 后的 dist/（含 assets/*.js）。
+#
+# 请到 GitHub：Settings → Pages → Build and deployment
+#   「Source」必须选：GitHub Actions
+#   不要选「Deploy from a branch」部署 main 根目录，否则没有 dist/assets → 控制台全是 404。
+#
 name: Build and Deploy to GitHub Pages
 
 on:
