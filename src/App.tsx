@@ -1829,12 +1829,14 @@ export default function App() {
     <div className="min-h-screen bg-[#fafafa] font-sans selection:bg-black selection:text-white overflow-hidden">
       {renderHeader()}
       
-      <main 
+      <main
         className={`fixed inset-0 pt-16 pb-16 overflow-hidden flex items-center justify-center ${
           pickingTarget ? 'cursor-crosshair' : ''
         }`}
       >
-        <div className={`w-full h-full overflow-auto p-4 md:p-12 flex flex-col items-center justify-center custom-scrollbar`}>
+        <div className={`w-full h-full overflow-auto flex flex-col items-center justify-center p-2 sm:p-4 md:p-12 custom-scrollbar`}
+          style={{ maxWidth: '100vw', maxHeight: 'calc(100vh - 8rem)' }}
+        >
           {image && cutoutConfig.creationMode === 'manual' && (
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
@@ -1877,13 +1879,15 @@ export default function App() {
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={`flex ${
-                composition === 'block-bottom' ? 'flex-col' : 
+                composition === 'block-bottom' ? 'flex-col' :
                 composition === 'block-top' ? 'flex-col-reverse' :
                 composition === 'block-right' ? 'flex-row' : 'flex-row-reverse'
               } shadow-[0_40px_100px_-20px_rgba(0,0,0,0.2)] items-center gap-0 p-0 overflow-visible bg-white flex-shrink-0`}
-              style={{ 
+              style={{
                 width: (composition === 'block-bottom' || composition === 'block-top' ? image.width : image.width * 2) * zoom,
-                height: (composition === 'block-bottom' || composition === 'block-top' ? image.height * 2 : image.height) * zoom
+                height: (composition === 'block-bottom' || composition === 'block-top' ? image.height * 2 : image.height) * zoom,
+                maxWidth: 'min(100vw - 1rem, 100%)',
+                maxHeight: 'min(100vh - 8rem, 100%)',
               }}
             >
               <div className="relative leading-[0]">
@@ -1894,7 +1898,7 @@ export default function App() {
                   onMouseUp={handleCanvasMouseUp}
                   onMouseLeave={handleCanvasMouseUp}
                   className={`block p-0 m-0 border-none ${isDraggingImage ? 'cursor-grabbing' : 'cursor-grab'}`}
-                  style={{ width: image.width * zoom, height: image.height * zoom }}
+                  style={{ width: '100%', height: '100%', maxWidth: image.width * zoom, maxHeight: image.height * zoom, aspectRatio: `${image.width}/${image.height}`, objectFit: 'contain' }}
                 />
                 {selectedId && (() => {
                   const c = cutouts.find((x) => x.id === selectedId);
