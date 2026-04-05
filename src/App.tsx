@@ -705,6 +705,7 @@ export default function App() {
 
   /** 色块区域（blockCanvas）点击：选中/新建挖空 */
   const handleBlockCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.stopPropagation(); // 阻止事件冒泡
     if (!blockCanvasRef.current || !image) return;
 
     const rect = blockCanvasRef.current.getBoundingClientRect();
