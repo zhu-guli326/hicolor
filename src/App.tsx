@@ -257,6 +257,72 @@ function addShapePath(ctx: CanvasRenderingContext2D, kind: ShapeKind, size: numb
   }
 }
 
+/** 主图上的形状与色块画布镜像对称：上下排版沿水平缝翻转 y，左右排版沿竖缝翻转 x */
+function symmetricNormOnBlock(
+  nx: number,
+  ny: number,
+  composition: CompositionMode
+): { nx: number; ny: number } {
+  switch (composition) {
+    case 'block-bottom':
+    case 'block-top':
+      return { nx, ny: 1 - ny };
+    case 'block-left':
+    case 'block-right':
+      return { nx: 1 - nx, ny };
+    default:
+      return { nx, ny: 1 - ny };
+  }
+}
+
+/** 与 block 画布条纹/纯色绘制规则一致，在像素坐标采样颜色 */
+function sampleBlockPatternColor(
+  px: number,
+  py: number,
+  width: number,
+  height: number,
+  composition: CompositionMode,
+  bg: { type: BackgroundType; color1: string; color2: string; stripeSize: number }
+): string {
+  const x = Math.min(width - 1e-6, Math.max(0, px));
+  const y = Math.min(height - 1e-6, Math.max(0, py));
+  if (bg.type === 'solid') return bg.color1;
+  const s = Math.max(1, bg.stripeSize);
+  const isVertical = composition === 'block-left' || composition === 'block-right';
+  if (isVertical) {
+    const band = Math.floor(x / s) % 2;
+    return band === 0 ? bg.color2 : bg.color1;
+  }
+  const band = Math.floor(y / s) % 2;
+  return band === 0 ? bg.color2 : bg.color1;
+}
+
+/** 在原点绘制挖空形状（调用方已 translate + rotate） */
+function fillCutoutShapeAtOrigin(
+  ctx: CanvasRenderingContext2D,
+  c: Cutout,
+  currentSize: number,
+  fillStyle: string,
+  customSymbolPool: string
+) {
+  ctx.fillStyle = fillStyle;
+  if (isGlyphShapeKind(c.shapeKind)) {
+    ctx.font = `bold ${currentSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(cutoutGlyphChar(c, customSymbolPool), 0, 0);
+  } else if (c.shapeKind) {
+    ctx.beginPath();
+    addShapePath(ctx, c.shapeKind, currentSize);
+    ctx.fill();
+  } else {
+    ctx.font = `bold ${currentSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(c.char || 'A', 0, 0);
+  }
+}
+
 const COMPOSITIONS: { value: CompositionMode; label: string }[] = [
   { value: 'block-bottom', label: '色块在下方' },
   { value: 'block-top', label: '色块在上方' },
@@ -882,26 +948,25 @@ export default function App() {
     
     cutouts.forEach((c) => {
       const currentSize = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (canvasWidth / 800);
+      const sym = symmetricNormOnBlock(c.x, c.y, composition);
+      const holeColor = sampleBlockPatternColor(
+        sym.nx * imgWidth,
+        sym.ny * imgHeight,
+        imgWidth,
+        imgHeight,
+        composition,
+        bgConfig
+      );
       mainCtx.save();
       mainCtx.translate(c.x * imgWidth, c.y * imgHeight);
       mainCtx.rotate(c.angle);
-
-      mainCtx.globalCompositeOperation = 'destination-out';
-      if (isGlyphShapeKind(c.shapeKind)) {
-        mainCtx.font = `bold ${currentSize}px sans-serif`;
-        mainCtx.textAlign = 'center';
-        mainCtx.textBaseline = 'middle';
-        mainCtx.fillText(cutoutGlyphChar(c, cutoutConfig.customShapeSymbol), 0, 0);
-      } else if (c.shapeKind) {
-        mainCtx.beginPath();
-        addShapePath(mainCtx, c.shapeKind, currentSize);
-        mainCtx.fill();
-      } else {
-        mainCtx.font = `bold ${currentSize}px sans-serif`;
-        mainCtx.textAlign = 'center';
-        mainCtx.textBaseline = 'middle';
-        mainCtx.fillText(c.char || 'A', 0, 0);
-      }
+      fillCutoutShapeAtOrigin(
+        mainCtx,
+        c,
+        currentSize,
+        holeColor,
+        cutoutConfig.customShapeSymbol
+      );
       mainCtx.restore();
     });
 
@@ -1343,7 +1408,9 @@ export default function App() {
             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
           />
         </div>
-        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">形状内部照片填字的颜色</p>
+        <p className="text-[9px] text-gray-400 font-bold leading-snug">
+          主图形状颜色与色块对称位置一致（条纹/纯色）；下方色条仅用于色块侧挖空内透出照片时的填色。
+        </p>
       </div>
 
       <div className="space-y-4 pt-4 border-t border-gray-50">
