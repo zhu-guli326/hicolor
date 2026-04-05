@@ -410,6 +410,8 @@ export default function App() {
     customShapeSymbol: '★♥●',
     /** 形状挖空后填入的颜色（全局统一） */
     shapeColor: '#ffffff',
+    /** 每个元素位置散落的形状数量（>=1，1=单个形状） */
+    scatterCount: 3,
   });
 
   const [overlayTextConfig, setOverlayTextConfig] = useState({
@@ -940,23 +942,45 @@ export default function App() {
       );
     }
 
-    // 1. Render Main Image with Holes
+    // 1. 先画色块画布（条纹/纯色背景）
+    blockCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+    blockCtx.fillStyle = bgConfig.color1;
+    blockCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    if (bgConfig.type === 'stripes') {
+      blockCtx.fillStyle = bgConfig.color2;
+      const isVertical = composition === 'block-left' || composition === 'block-right';
+      if (isVertical) {
+        for (let i = 0; i < canvasWidth; i += bgConfig.stripeSize * 2) {
+          blockCtx.fillRect(i, 0, bgConfig.stripeSize, canvasHeight);
+        }
+      } else {
+        for (let i = 0; i < canvasHeight; i += bgConfig.stripeSize * 2) {
+          blockCtx.fillRect(0, i, canvasWidth, bgConfig.stripeSize);
+        }
+      }
+    }
+
+    // 从色块画布读取像素数据用于主图画孔洞
+    const blockImageData = blockCtx.getImageData(0, 0, canvasWidth, canvasHeight);
+    const blockData = blockImageData.data;
+
+    function sampleFromBlockData(nx: number, ny: number): string {
+      const px = Math.round(nx * (canvasWidth - 1));
+      const py = Math.round(ny * (canvasHeight - 1));
+      const idx = (py * canvasWidth + px) * 4;
+      return `rgba(${blockData[idx]},${blockData[idx + 1]},${blockData[idx + 2]},${blockData[idx + 3] / 255})`;
+    }
+
+    // 2. 画主图（照片 + 填色孔洞）
     mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-    
     mainCtx.save();
     mainCtx.drawImage(image, 0, 0, imgWidth, imgHeight);
-    
+
     cutouts.forEach((c) => {
       const currentSize = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (canvasWidth / 800);
       const sym = symmetricNormOnBlock(c.x, c.y, composition);
-      const holeColor = sampleBlockPatternColor(
-        sym.nx * imgWidth,
-        sym.ny * imgHeight,
-        imgWidth,
-        imgHeight,
-        composition,
-        bgConfig
-      );
+      const holeColor = sampleFromBlockData(sym.nx, sym.ny);
       mainCtx.save();
       mainCtx.translate(c.x * imgWidth, c.y * imgHeight);
       mainCtx.rotate(c.angle);
@@ -970,11 +994,9 @@ export default function App() {
       mainCtx.restore();
     });
 
-    // 叠字仅在色块侧绘制，主图不再重复叠字
-
     mainCtx.restore();
 
-    // 2. Render Background Block
+    // 3. 色块画布画形状孔洞（透照片）
     blockCtx.clearRect(0, 0, canvasWidth, canvasHeight);
     blockCtx.fillStyle = bgConfig.color1;
     blockCtx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -995,61 +1017,137 @@ export default function App() {
 
     cutouts.forEach((c, index) => {
       const currentSize = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (canvasWidth / 800);
-      blockCtx.save();
-      
-      let dx, dy;
-      if (cutoutConfig.distributionMode === 'sync' || cutoutConfig.creationMode === 'manual') {
-        dx = c.x * imgWidth;
-        dy = c.y * imgHeight;
-      } else {
-        // Scatter mode for auto-generated shapes: spread them out
-        const seedX = index * 123.456;
-        const seedY = index * 789.012;
-        dx = ((Math.sin(seedX) + 1) / 2) * canvasWidth;
-        dy = ((Math.cos(seedY) + 1) / 2) * canvasHeight;
-      }
+      const count = cutoutConfig.scatterCount;
 
-      blockCtx.translate(dx, dy);
-      blockCtx.rotate(c.angle);
-
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = currentSize * 2;
-      tempCanvas.height = currentSize * 2;
-      const tctx = tempCanvas.getContext('2d');
-      if (tctx) {
-        tctx.save();
-        tctx.translate(currentSize, currentSize);
-        if (isGlyphShapeKind(c.shapeKind)) {
-          tctx.font = `bold ${currentSize}px sans-serif`;
-          tctx.textAlign = 'center';
-          tctx.textBaseline = 'middle';
-          tctx.fillStyle = cutoutConfig.shapeColor;
-          tctx.fillText(cutoutGlyphChar(c, cutoutConfig.customShapeSymbol), 0, 0);
-        } else if (c.shapeKind) {
-          tctx.beginPath();
-          addShapePath(tctx, c.shapeKind, currentSize);
-          tctx.fillStyle = cutoutConfig.shapeColor;
-          tctx.fill();
+      if (count <= 1) {
+        // 单形状：原有逻辑
+        blockCtx.save();
+        let dx, dy;
+        if (cutoutConfig.distributionMode === 'sync' || cutoutConfig.creationMode === 'manual') {
+          dx = c.x * imgWidth;
+          dy = c.y * imgHeight;
         } else {
-          tctx.font = `bold ${currentSize}px sans-serif`;
-          tctx.textAlign = 'center';
-          tctx.textBaseline = 'middle';
-          tctx.fillStyle = cutoutConfig.shapeColor;
-          tctx.fillText(c.char || 'A', 0, 0);
+          const seedX = index * 123.456;
+          const seedY = index * 789.012;
+          dx = ((Math.sin(seedX) + 1) / 2) * canvasWidth;
+          dy = ((Math.cos(seedY) + 1) / 2) * canvasHeight;
         }
-        tctx.restore();
-        tctx.globalCompositeOperation = 'source-in';
-        tctx.drawImage(
-          image,
-          c.x * image.width - (currentSize * image.width / imgWidth) / 2,
-          c.y * image.height - (currentSize * image.height / imgHeight) / 2,
-          currentSize * image.width / imgWidth,
-          currentSize * image.height / imgHeight,
-          0, 0, currentSize * 2, currentSize * 2
-        );
-        blockCtx.drawImage(tempCanvas, -currentSize, -currentSize);
+        blockCtx.translate(dx, dy);
+        blockCtx.rotate(c.angle);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = currentSize * 2;
+        tempCanvas.height = currentSize * 2;
+        const tctx = tempCanvas.getContext('2d');
+        if (tctx) {
+          tctx.save();
+          tctx.translate(currentSize, currentSize);
+          if (isGlyphShapeKind(c.shapeKind)) {
+            tctx.font = `bold ${currentSize}px sans-serif`;
+            tctx.textAlign = 'center';
+            tctx.textBaseline = 'middle';
+            tctx.fillStyle = cutoutConfig.shapeColor;
+            tctx.fillText(cutoutGlyphChar(c, cutoutConfig.customShapeSymbol), 0, 0);
+          } else if (c.shapeKind) {
+            tctx.beginPath();
+            addShapePath(tctx, c.shapeKind, currentSize);
+            tctx.fillStyle = cutoutConfig.shapeColor;
+            tctx.fill();
+          } else {
+            tctx.font = `bold ${currentSize}px sans-serif`;
+            tctx.textAlign = 'center';
+            tctx.textBaseline = 'middle';
+            tctx.fillStyle = cutoutConfig.shapeColor;
+            tctx.fillText(c.char || 'A', 0, 0);
+          }
+          tctx.restore();
+          tctx.globalCompositeOperation = 'source-in';
+          tctx.drawImage(
+            image,
+            c.x * image.width - (currentSize * image.width / imgWidth) / 2,
+            c.y * image.height - (currentSize * image.height / imgHeight) / 2,
+            currentSize * image.width / imgWidth,
+            currentSize * image.height / imgHeight,
+            0, 0, currentSize * 2, currentSize * 2
+          );
+          blockCtx.drawImage(tempCanvas, -currentSize, -currentSize);
+        }
+        blockCtx.restore();
+      } else {
+        // 散落形状群：以元素位置为中心，随机散布多个小形状
+        blockCtx.save();
+        let baseX, baseY;
+        if (cutoutConfig.distributionMode === 'sync' || cutoutConfig.creationMode === 'manual') {
+          baseX = c.x * imgWidth;
+          baseY = c.y * imgHeight;
+        } else {
+          const seedX = index * 123.456;
+          const seedY = index * 789.012;
+          baseX = ((Math.sin(seedX) + 1) / 2) * canvasWidth;
+          baseY = ((Math.cos(seedY) + 1) / 2) * canvasHeight;
+        }
+        blockCtx.translate(baseX, baseY);
+        blockCtx.rotate(c.angle);
+
+        // 随机形状类型池
+        const shapeKinds: ShapeKind[] = ['circle', 'square', 'star', 'drop', 'heart'];
+        const rng = (seed: number) => Math.abs(Math.sin(seed * 9301 + 49297) * 233280) % 1;
+        const getRand = (seed: number) => rng(seed);
+
+        for (let s = 0; s < count; s++) {
+          const r1 = getRand(index * 100 + s * 7 + 1);
+          const r2 = getRand(index * 100 + s * 13 + 2);
+          const r3 = getRand(index * 100 + s * 17 + 3);
+          const r4 = getRand(index * 100 + s * 19 + 4);
+          const r5 = getRand(index * 100 + s * 23 + 5);
+
+          // 随机散落位置（以 currentSize 为半径）
+          const scatterRadius = currentSize * 0.8;
+          const angle = r1 * Math.PI * 2;
+          const dist = r2 * scatterRadius;
+          const sx = Math.cos(angle) * dist;
+          const sy = Math.sin(angle) * dist;
+
+          // 随机大小（0.3~1.0 范围）
+          const scale = 0.3 + r3 * 0.7;
+          const sc = currentSize * scale * 0.5;
+
+          // 随机旋转
+          const sAngle = r4 * Math.PI * 2;
+
+          blockCtx.save();
+          blockCtx.translate(sx, sy);
+          blockCtx.rotate(sAngle);
+
+          const sk = shapeKinds[Math.floor(r5 * shapeKinds.length)];
+          const scSize = currentSize * scale;
+
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = sc * 2;
+          tempCanvas.height = sc * 2;
+          const tctx = tempCanvas.getContext('2d');
+          if (tctx) {
+            tctx.save();
+            tctx.translate(sc, sc);
+            tctx.beginPath();
+            addShapePath(tctx, sk, scSize);
+            tctx.fillStyle = cutoutConfig.shapeColor;
+            tctx.fill();
+            tctx.restore();
+            tctx.globalCompositeOperation = 'source-in';
+            tctx.drawImage(
+              image,
+              c.x * image.width - (currentSize * image.width / imgWidth) / 2,
+              c.y * image.height - (currentSize * image.height / imgHeight) / 2,
+              currentSize * image.width / imgWidth,
+              currentSize * image.height / imgHeight,
+              0, 0, sc * 2, sc * 2
+            );
+            blockCtx.drawImage(tempCanvas, -sc, -sc);
+          }
+          blockCtx.restore();
+        }
+        blockCtx.restore();
       }
-      blockCtx.restore();
     });
 
     if (showLine && lineLayout) {
@@ -1369,6 +1467,23 @@ export default function App() {
           />
         </div>
 
+        <div className="space-y-3">
+          <div className="flex justify-between items-end">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">每槽散落数量</label>
+            <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.scatterCount}</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="12"
+            step="1"
+            value={cutoutConfig.scatterCount}
+            onChange={(e) => setCutoutConfig((prev) => ({ ...prev, scatterCount: Number(e.target.value) }))}
+            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+          />
+          <p className="text-[9px] text-gray-400 font-bold">1=单形状，&gt;1=散落小形状群</p>
+        </div>
+
         <div className={`space-y-3 ${cutoutConfig.creationMode === 'manual' ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="flex justify-between items-end">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">形状数量</label>
@@ -1409,7 +1524,7 @@ export default function App() {
           />
         </div>
         <p className="text-[9px] text-gray-400 font-bold leading-snug">
-          主图形状颜色与色块对称位置一致（条纹/纯色）；下方色条仅用于色块侧挖空内透出照片时的填色。
+          形状颜色控制色块侧散落形状群内部的填色（主图形状颜色自动跟随条纹/纯色底色）。
         </p>
       </div>
 
