@@ -24,12 +24,25 @@ import {
   Heart,
   Plus,
   CaseUpper,
+  AlignStartVertical,
+  AlignStartHorizontal,
+  AlignEndVertical,
+  AlignEndHorizontal,
+  SlidersHorizontal,
+  PaintBucket,
+  Images,
+  Image as ImageIcon,
+  Sparkles,
+  Sun,
+  Clock,
+  Triangle,
+  Type,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 // --- Types & Constants ---
 
-type Tab = 'canvas' | 'background' | 'elements';
+type BottomNavTab = 'background' | 'elements';
 
 type CompositionMode = 'block-bottom' | 'block-top' | 'block-left' | 'block-right';
 type BackgroundType = 'solid' | 'stripes';
@@ -102,15 +115,15 @@ const TEXT_FONT_PRESETS: { value: string; label: string }[] = [
   { value: '"Knewave", cursive', label: 'Knewave' },
 ];
 
-const SHAPE_OPTIONS: { value: ShapeKind; icon: LucideIcon; title: string }[] = [
-  { value: 'circle', icon: Circle, title: '圆形' },
-  { value: 'square', icon: Square, title: '正方形' },
-  { value: 'star', icon: Star, title: '五角星' },
-  { value: 'drop', icon: Droplet, title: '水滴' },
-  { value: 'snowflake', icon: Snowflake, title: '雪花' },
-  { value: 'heart', icon: Heart, title: '爱心' },
-  { value: 'randomLetters', icon: CaseUpper, title: '随机字母' },
-  { value: 'symbol', icon: Plus, title: '自定义符号' },
+const SHAPE_OPTIONS: { value: ShapeKind; icon: LucideIcon; title: string; caption: string }[] = [
+  { value: 'circle', icon: Circle, title: '圆形', caption: '圆形' },
+  { value: 'square', icon: Square, title: '正方形', caption: '正方形' },
+  { value: 'star', icon: Star, title: '五角星', caption: '五角星' },
+  { value: 'drop', icon: Droplet, title: '水滴', caption: '水滴' },
+  { value: 'snowflake', icon: Snowflake, title: '雪花', caption: '雪花' },
+  { value: 'heart', icon: Heart, title: '爱心', caption: '爱心' },
+  { value: 'randomLetters', icon: CaseUpper, title: '随机字母', caption: '随机字母' },
+  { value: 'symbol', icon: Plus, title: '自定义符号', caption: '自定义' },
 ];
 
 function pickRandomSymbolChar(s: string): string {
@@ -257,24 +270,6 @@ function addShapePath(ctx: CanvasRenderingContext2D, kind: ShapeKind, size: numb
   }
 }
 
-/** 主图上的形状与色块画布镜像对称：上下排版沿水平缝翻转 y，左右排版沿竖缝翻转 x */
-function symmetricNormOnBlock(
-  nx: number,
-  ny: number,
-  composition: CompositionMode
-): { nx: number; ny: number } {
-  switch (composition) {
-    case 'block-bottom':
-    case 'block-top':
-      return { nx, ny: 1 - ny };
-    case 'block-left':
-    case 'block-right':
-      return { nx: 1 - nx, ny };
-    default:
-      return { nx, ny: 1 - ny };
-  }
-}
-
 /** 与 block 画布条纹/纯色绘制规则一致，在像素坐标采样颜色 */
 function sampleBlockPatternColor(
   px: number,
@@ -323,18 +318,18 @@ function fillCutoutShapeAtOrigin(
   }
 }
 
-const COMPOSITIONS: { value: CompositionMode; label: string }[] = [
-  { value: 'block-bottom', label: '色块在下方' },
-  { value: 'block-top', label: '色块在上方' },
-  { value: 'block-left', label: '色块在左侧' },
-  { value: 'block-right', label: '色块在右侧' },
+const COMPOSITIONS: { value: CompositionMode; label: string; icon: React.FC<{ size?: number; strokeWidth?: number }> }[] = [
+  { value: 'block-bottom', label: '色块在下方', icon: AlignEndHorizontal },
+  { value: 'block-top', label: '色块在上方', icon: AlignStartHorizontal },
+  { value: 'block-left', label: '色块在左侧', icon: AlignStartVertical },
+  { value: 'block-right', label: '色块在右侧', icon: AlignEndVertical },
 ];
 
 // --- Main Application ---
 
 export default function App() {
   // --- State ---
-  const [activeTab, setActiveTab] = useState<Tab>('canvas');
+  const [activeTab, setActiveTab] = useState<BottomNavTab | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [cutouts, setCutouts] = useState<Cutout[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -344,6 +339,8 @@ export default function App() {
   const [pickingTarget, setPickingTarget] = useState<'color1' | 'color2' | null>(null);
   const [elementsPanelTab, setElementsPanelTab] = useState<ElementsPanelTab>('shape');
 
+  const [expandedSlider, setExpandedSlider] = useState<string | null>(null);
+
   // 1. Canvas Configuration
   const [composition, setComposition] = useState<CompositionMode>('block-bottom');
   const [zoom, setZoom] = useState(0.6);
@@ -351,6 +348,28 @@ export default function App() {
   useEffect(() => {
     setPickingTarget(null);
   }, [activeTab]);
+
+  const settingsPanelOpen = activeTab === 'background' || activeTab === 'elements';
+
+  const settingsPanelRef = useRef<HTMLDivElement>(null);
+  const bottomNavRef = useRef<HTMLElement>(null);
+
+  /** 点击面板、底栏、顶栏以外的区域时收起设置面板（含取色、展开滑块） */
+  useEffect(() => {
+    if (!settingsPanelOpen) return;
+    const onPointerDownCapture = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (settingsPanelRef.current?.contains(t)) return;
+      if (bottomNavRef.current?.contains(t)) return;
+      const headerEl = document.querySelector('header');
+      if (headerEl?.contains(t)) return;
+      setActiveTab(null);
+      setPickingTarget(null);
+      setExpandedSlider(null);
+    };
+    document.addEventListener('pointerdown', onPointerDownCapture, true);
+    return () => document.removeEventListener('pointerdown', onPointerDownCapture, true);
+  }, [settingsPanelOpen]);
 
   const fitToScreen = useCallback(() => {
     if (!image) return;
@@ -362,7 +381,7 @@ export default function App() {
     
     // We want to fit in the space between header and bottom nav
     // If settings panel is open, it takes up more space
-    const settingsPanelHeight = activeTab ? window.innerHeight * 0.4 : 0;
+    const settingsPanelHeight = settingsPanelOpen ? window.innerHeight * 0.4 : 0;
     
     const availableWidth = window.innerWidth - padding;
     const availableHeight = window.innerHeight - headerHeight - navHeight - settingsPanelHeight - padding;
@@ -382,13 +401,13 @@ export default function App() {
     // Ensure we don't zoom in too much, but fit perfectly
     const newZoom = Math.min(scaleX, scaleY, 1);
     setZoom(newZoom);
-  }, [image, composition, activeTab]);
+  }, [image, composition, settingsPanelOpen]);
 
   useEffect(() => {
     fitToScreen();
     window.addEventListener('resize', fitToScreen);
     return () => window.removeEventListener('resize', fitToScreen);
-  }, [image, composition, activeTab, fitToScreen]);
+  }, [image, composition, settingsPanelOpen, fitToScreen]);
 
   // 2. Background Configuration
   const [bgConfig, setBgConfig] = useState({
@@ -419,12 +438,16 @@ export default function App() {
     fontSize: 52,
     fontFamily: '"Noto Sans SC", sans-serif',
     fillColor: '#ffffff',
+    strokeColor: '#000000',
     /** 叠字在画面中的相对位置 (0–1)，默认居中 */
     x: 0.5,
     y: 0.5,
   });
   const overlayTextConfigRef = useRef(overlayTextConfig);
   overlayTextConfigRef.current = overlayTextConfig;
+
+  /** 叠字面板内部 Tab：字体 / 样式 */
+  const [overlayPanelTab, setOverlayPanelTab] = useState<'font' | 'style'>('font');
 
   const [isDraggingOverlay, setIsDraggingOverlay] = useState(false);
   const [isResizingOverlay, setIsResizingOverlay] = useState(false);
@@ -449,7 +472,9 @@ export default function App() {
 
   // Logic
   const generateAutoCutouts = useCallback(
-    (opts?: { defaultShapeKind?: ShapeKind; autoCount?: number }) => {
+    (opts?: { defaultShapeKind?: ShapeKind; autoCount?: number; imageOverride?: HTMLImageElement }) => {
+    const img = opts?.imageOverride ?? image;
+    if (!img) return;
     const { autoCount, baseSize, variation } = cutoutConfig;
     const count = Math.max(1, Math.round(opts?.autoCount ?? autoCount));
     const dkForGen = opts?.defaultShapeKind ?? cutoutConfig.defaultShapeKind;
@@ -458,7 +483,7 @@ export default function App() {
     
     // Reference dimensions for collision math (based on baseWidth=800)
     const refW = 800;
-    const refH = image ? (image.height / image.width) * refW : 800;
+    const refH = (img.height / img.width) * refW;
 
     for (let i = 0; i < count; i++) {
       let placed = false;
@@ -535,6 +560,7 @@ export default function App() {
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const fileInput = e.currentTarget;
 
     let blobToLoad: Blob;
 
@@ -570,9 +596,9 @@ export default function App() {
         } else {
           setComposition('block-bottom'); // Landscape -> Vertical layout
         }
-        generateAutoCutouts();
-        // Delay fit to screen to allow state updates
+        generateAutoCutouts({ imageOverride: img });
         setTimeout(fitToScreen, 100);
+        fileInput.value = '';
       };
       img.src = event.target?.result as string;
     };
@@ -919,7 +945,7 @@ export default function App() {
     const oxFontFamily = overlayTextConfig.fontFamily;
     const oxFill = overlayTextConfig.fillColor;
     const scaleRef = canvasWidth / 800;
-    const oxStroke = '#0a0a0a';
+    const oxStroke = overlayTextConfig.strokeColor;
 
     let lineLayout: {
       fontSize: number;
@@ -979,8 +1005,7 @@ export default function App() {
 
     cutouts.forEach((c) => {
       const currentSize = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (canvasWidth / 800);
-      const sym = symmetricNormOnBlock(c.x, c.y, composition);
-      const holeColor = sampleFromBlockData(sym.nx, sym.ny);
+      const holeColor = sampleFromBlockData(c.x, c.y);
       mainCtx.save();
       mainCtx.translate(c.x * imgWidth, c.y * imgHeight);
       mainCtx.rotate(c.angle);
@@ -1015,23 +1040,25 @@ export default function App() {
       }
     }
 
+    const isSyncMode = cutoutConfig.distributionMode === 'sync' || cutoutConfig.creationMode === 'manual';
+
     cutouts.forEach((c, index) => {
       const currentSize = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (canvasWidth / 800);
-      const count = cutoutConfig.scatterCount;
+      const count = isSyncMode ? 1 : cutoutConfig.scatterCount;
 
       if (count <= 1) {
-        // 单形状：原有逻辑
+        // 单形状模式
         blockCtx.save();
-        let dx, dy;
-        if (cutoutConfig.distributionMode === 'sync' || cutoutConfig.creationMode === 'manual') {
-          dx = c.x * imgWidth;
-          dy = c.y * imgHeight;
-        } else {
+        let dx = c.x * imgWidth;
+        let dy = c.y * imgHeight;
+
+        if (!isSyncMode) {
           const seedX = index * 123.456;
           const seedY = index * 789.012;
           dx = ((Math.sin(seedX) + 1) / 2) * canvasWidth;
           dy = ((Math.cos(seedY) + 1) / 2) * canvasHeight;
         }
+
         blockCtx.translate(dx, dy);
         blockCtx.rotate(c.angle);
         const tempCanvas = document.createElement('canvas');
@@ -1072,6 +1099,31 @@ export default function App() {
           blockCtx.drawImage(tempCanvas, -currentSize, -currentSize);
         }
         blockCtx.restore();
+
+        // 为选中的元素添加高亮边框（在形状外围画一圈醒目的边）
+        if (c.id === selectedId) {
+          blockCtx.save();
+          blockCtx.translate(dx, dy);
+          blockCtx.rotate(c.angle);
+          blockCtx.strokeStyle = '#22c55e';
+          blockCtx.lineWidth = 3;
+          blockCtx.setLineDash([6, 4]);
+          if (isGlyphShapeKind(c.shapeKind)) {
+            const char = cutoutGlyphChar(c, cutoutConfig.customShapeSymbol);
+            blockCtx.font = `bold ${currentSize}px sans-serif`;
+            blockCtx.textAlign = 'center';
+            blockCtx.textBaseline = 'middle';
+            const metrics = blockCtx.measureText(char);
+            const tw = metrics.width;
+            const th = currentSize;
+            blockCtx.strokeRect(-tw / 2 - 4, -th / 2 - 4, tw + 8, th + 8);
+          } else if (c.shapeKind) {
+            blockCtx.beginPath();
+            addShapePath(blockCtx, c.shapeKind, currentSize + 6);
+            blockCtx.stroke();
+          }
+          blockCtx.restore();
+        }
       } else {
         // 散落形状群：以元素位置为中心，随机散布多个小形状
         blockCtx.save();
@@ -1088,8 +1140,6 @@ export default function App() {
         blockCtx.translate(baseX, baseY);
         blockCtx.rotate(c.angle);
 
-        // 随机形状类型池
-        const shapeKinds: ShapeKind[] = ['circle', 'square', 'star', 'drop', 'heart'];
         const rng = (seed: number) => Math.abs(Math.sin(seed * 9301 + 49297) * 233280) % 1;
         const getRand = (seed: number) => rng(seed);
 
@@ -1098,7 +1148,6 @@ export default function App() {
           const r2 = getRand(index * 100 + s * 13 + 2);
           const r3 = getRand(index * 100 + s * 17 + 3);
           const r4 = getRand(index * 100 + s * 19 + 4);
-          const r5 = getRand(index * 100 + s * 23 + 5);
 
           // 随机散落位置（以 currentSize 为半径）
           const scatterRadius = currentSize * 0.8;
@@ -1118,8 +1167,8 @@ export default function App() {
           blockCtx.translate(sx, sy);
           blockCtx.rotate(sAngle);
 
-          const sk = shapeKinds[Math.floor(r5 * shapeKinds.length)];
           const scSize = currentSize * scale;
+          const kind = c.shapeKind;
 
           const tempCanvas = document.createElement('canvas');
           tempCanvas.width = sc * 2;
@@ -1128,10 +1177,26 @@ export default function App() {
           if (tctx) {
             tctx.save();
             tctx.translate(sc, sc);
-            tctx.beginPath();
-            addShapePath(tctx, sk, scSize);
             tctx.fillStyle = cutoutConfig.shapeColor;
-            tctx.fill();
+            if (isGlyphShapeKind(kind)) {
+              tctx.font = `bold ${scSize}px sans-serif`;
+              tctx.textAlign = 'center';
+              tctx.textBaseline = 'middle';
+              const ch =
+                kind === 'randomLetters'
+                  ? randomUpperLetter()
+                  : pickRandomSymbolChar(cutoutConfig.customShapeSymbol);
+              tctx.fillText(ch, 0, 0);
+            } else if (kind) {
+              tctx.beginPath();
+              addShapePath(tctx, kind, scSize);
+              tctx.fill();
+            } else {
+              tctx.font = `bold ${scSize}px sans-serif`;
+              tctx.textAlign = 'center';
+              tctx.textBaseline = 'middle';
+              tctx.fillText(c.char || 'A', 0, 0);
+            }
             tctx.restore();
             tctx.globalCompositeOperation = 'source-in';
             tctx.drawImage(
@@ -1144,6 +1209,21 @@ export default function App() {
             );
             blockCtx.drawImage(tempCanvas, -sc, -sc);
           }
+          blockCtx.restore();
+        }
+
+        // 为散落形状群的选中元素添加高亮边框
+        if (c.id === selectedId) {
+          blockCtx.save();
+          blockCtx.translate(baseX, baseY);
+          blockCtx.rotate(c.angle);
+          blockCtx.strokeStyle = '#22c55e';
+          blockCtx.lineWidth = 3;
+          blockCtx.setLineDash([6, 4]);
+          const groupRadius = currentSize + 10;
+          blockCtx.beginPath();
+          blockCtx.arc(0, 0, groupRadius, 0, Math.PI * 2);
+          blockCtx.stroke();
           blockCtx.restore();
         }
         blockCtx.restore();
@@ -1281,8 +1361,10 @@ export default function App() {
     }
   };
 
+  const selectedCutoutExists = Boolean(selectedId && cutouts.some((c) => c.id === selectedId));
+
   const elementSelectedEditor =
-    selectedId ? (
+    selectedCutoutExists ? (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -1290,7 +1372,7 @@ export default function App() {
       >
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-black rounded-full animate-pulse" />
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             <span className="text-[10px] font-black text-gray-900 uppercase tracking-wider">正在编辑选中形状</span>
           </div>
           <button
@@ -1322,7 +1404,7 @@ export default function App() {
                   prev.map((c) => (c.id === selectedId ? { ...c, sizeFactor: val } : c))
                 );
               }}
-              className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer accent-black"
+              className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
             />
           </div>
 
@@ -1345,7 +1427,7 @@ export default function App() {
                   prev.map((c) => (c.id === selectedId ? { ...c, angle: val } : c))
                 );
               }}
-              className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer accent-black"
+              className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
             />
           </div>
         </div>
@@ -1353,26 +1435,48 @@ export default function App() {
     ) : null;
 
   const elementOverlayTextPanel = (
-    <div className="space-y-5">
-      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">画布叠字</label>
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">一句话</label>
-        <textarea
-          value={overlayTextConfig.content}
-          onChange={(e) =>
-            setOverlayTextConfig((prev) => ({ ...prev, content: e.target.value }))
-          }
-          rows={3}
-          className="w-full min-h-[5rem] px-4 py-3 rounded-2xl border border-gray-100 text-sm font-bold text-gray-900 focus:border-black outline-none bg-white shadow-sm resize-y"
-          placeholder="写一句话…可换行"
-        />
-        <p className="text-[9px] text-gray-400 font-bold leading-snug">
-          有内容后仅在色块一侧显示叠字：照片纹理填字 + 字色与细描边。在色块画面上点击文字区域可拖动，拖动手柄调大小。
-        </p>
+    <div className="space-y-4">
+      {/* 第一行：输入文字 */}
+      <textarea
+        value={overlayTextConfig.content}
+        onChange={(e) =>
+          setOverlayTextConfig((prev) => ({ ...prev, content: e.target.value }))
+        }
+        rows={3}
+        className="w-full min-h-[5rem] px-4 py-3 rounded-2xl border border-gray-100 text-sm font-bold text-gray-900 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none bg-white shadow-sm resize-y"
+        placeholder="写一句话…可换行"
+      />
+
+      {/* Tab 切换：字体 / 样式 */}
+      <div className="flex gap-1 rounded-2xl border border-gray-100 bg-gray-50/90 p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
+        <button
+          type="button"
+          onClick={() => setOverlayPanelTab('font')}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-black transition-all ${
+            overlayPanelTab === 'font'
+              ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-200/70'
+              : 'text-gray-500 hover:bg-white/50 hover:text-gray-700'
+          }`}
+        >
+          <Type size={15} strokeWidth={2.25} className="shrink-0 opacity-90" aria-hidden />
+          字体
+        </button>
+        <button
+          type="button"
+          onClick={() => setOverlayPanelTab('style')}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-black transition-all ${
+            overlayPanelTab === 'style'
+              ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-200/70'
+              : 'text-gray-500 hover:bg-white/50 hover:text-gray-700'
+          }`}
+        >
+          <SlidersHorizontal size={15} strokeWidth={2.25} className="shrink-0 opacity-90" aria-hidden />
+          样式
+        </button>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">字体</label>
+      {/* 字体 Tab */}
+      {overlayPanelTab === 'font' && (
         <div className="flex flex-wrap gap-2">
           {TEXT_FONT_PRESETS.map((f) => (
             <button
@@ -1381,7 +1485,7 @@ export default function App() {
               onClick={() => setOverlayTextConfig((prev) => ({ ...prev, fontFamily: f.value }))}
               className={`px-3 py-2 rounded-xl text-[11px] font-bold border transition-all ${
                 overlayTextConfig.fontFamily === f.value
-                  ? 'bg-black border-black text-white shadow-md'
+                  ? 'border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-200/70'
                   : 'bg-white border-gray-100 text-gray-600 hover:border-gray-300'
               }`}
               style={{ fontFamily: f.value.replace(/"/g, '') }}
@@ -1390,46 +1494,64 @@ export default function App() {
             </button>
           ))}
         </div>
-      </div>
+      )}
 
-      <div className="space-y-3">
-        <div className="flex justify-between items-end">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">字号</label>
-          <span className="text-[10px] font-mono font-bold text-gray-900">
-            {overlayTextConfig.fontSize}
-          </span>
+      {/* 样式 Tab：三列并列 — 标题 + 滑块/取色，无图标；点开「样式」即可直接调 */}
+      {overlayPanelTab === 'style' && (
+        <div className="space-y-3">
+          <p className="text-[10px] font-black text-gray-400 tracking-[0.2em]">文字样式</p>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-4">
+            <div className="min-w-0 space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] font-black text-gray-500">字号</span>
+                <span className="text-[11px] font-mono font-bold tabular-nums text-gray-900">
+                  {overlayTextConfig.fontSize}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={24}
+                max={160}
+                value={overlayTextConfig.fontSize}
+                onChange={(e) =>
+                  setOverlayTextConfig((prev) => ({ ...prev, fontSize: Number(e.target.value) }))
+                }
+                className="w-full h-2 rounded-full bg-gray-100 appearance-none cursor-pointer accent-emerald-600"
+              />
+            </div>
+            <div className="min-w-0 space-y-2">
+              <span className="block text-[10px] font-black text-gray-500">字体颜色</span>
+              <div
+                className="relative h-10 w-full overflow-hidden rounded-xl border border-gray-200 shadow-inner"
+                style={{ backgroundColor: overlayTextConfig.fillColor }}
+              >
+                <input
+                  type="color"
+                  value={overlayTextConfig.fillColor}
+                  onChange={(e) => setOverlayTextConfig((prev) => ({ ...prev, fillColor: e.target.value }))}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  aria-label="字体颜色"
+                />
+              </div>
+            </div>
+            <div className="min-w-0 space-y-2">
+              <span className="block text-[10px] font-black text-gray-500">描边</span>
+              <div
+                className="relative h-10 w-full overflow-hidden rounded-xl border border-gray-200 shadow-inner"
+                style={{ backgroundColor: overlayTextConfig.strokeColor }}
+              >
+                <input
+                  type="color"
+                  value={overlayTextConfig.strokeColor}
+                  onChange={(e) => setOverlayTextConfig((prev) => ({ ...prev, strokeColor: e.target.value }))}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  aria-label="描边颜色"
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        <input
-          type="range"
-          min="24"
-          max="160"
-          value={overlayTextConfig.fontSize}
-          onChange={(e) =>
-            setOverlayTextConfig((prev) => ({
-              ...prev,
-              fontSize: Number(e.target.value),
-            }))
-          }
-          className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">叠字字色（描边之上）</label>
-        <div
-          className="relative h-11 rounded-2xl overflow-hidden border border-gray-100 shadow-sm"
-          style={{ backgroundColor: overlayTextConfig.fillColor }}
-        >
-          <input
-            type="color"
-            value={overlayTextConfig.fillColor}
-            onChange={(e) =>
-              setOverlayTextConfig((prev) => ({ ...prev, fillColor: e.target.value }))
-            }
-            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-          />
-        </div>
-      </div>
+      )}
     </div>
   );
 
@@ -1447,7 +1569,7 @@ export default function App() {
             max="200"
             value={cutoutConfig.baseSize}
             onChange={(e) => setCutoutConfig((prev) => ({ ...prev, baseSize: Number(e.target.value) }))}
-            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
           />
         </div>
 
@@ -1463,7 +1585,7 @@ export default function App() {
             step="0.5"
             value={cutoutConfig.variation}
             onChange={(e) => setCutoutConfig((prev) => ({ ...prev, variation: Number(e.target.value) }))}
-            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
           />
         </div>
 
@@ -1479,7 +1601,7 @@ export default function App() {
             step="1"
             value={cutoutConfig.scatterCount}
             onChange={(e) => setCutoutConfig((prev) => ({ ...prev, scatterCount: Number(e.target.value) }))}
-            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
           />
           <p className="text-[9px] text-gray-400 font-bold">1=单形状，&gt;1=散落小形状群</p>
         </div>
@@ -1502,7 +1624,7 @@ export default function App() {
                 generateAutoCutouts({ autoCount: next });
               }
             }}
-            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
           />
           {cutoutConfig.creationMode === 'manual' && (
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">自动模式下可调</p>
@@ -1573,7 +1695,7 @@ export default function App() {
         <button
           type="button"
           onClick={generateAutoCutouts}
-          className="flex-1 flex items-center justify-center gap-2 bg-black text-white py-4 rounded-2xl transition-all text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-95"
+          className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-4 rounded-2xl transition-all text-[11px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95"
         >
           <RefreshCw size={16} />
           <span>重新生成</span>
@@ -1604,7 +1726,7 @@ export default function App() {
 
   // --- Render Helpers ---
 
-  const renderTabButton = (id: Tab, icon: React.ReactNode, label: string) => (
+  const renderTabButton = (id: BottomNavTab, icon: React.ReactNode, label: string) => (
     <button
       type="button"
       onClick={() => setActiveTab(activeTab === id ? null : id)}
@@ -1621,14 +1743,14 @@ export default function App() {
   );
 
   const renderHeader = () => (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-6 z-50">
+    <header className="fixed top-0 left-0 right-0 z-50 flex min-h-14 items-center justify-between border-b border-gray-100 bg-white/80 px-3 pt-[max(0px,env(safe-area-inset-top))] pb-2 backdrop-blur-xl sm:min-h-16 sm:px-6 sm:pb-0">
       <div className="flex items-center">
-        <h1 className="text-xl font-black text-gray-900 tracking-tighter italic leading-none">hicolor</h1>
+        <h1 className="text-lg font-black tracking-tighter text-gray-900 italic leading-none sm:text-xl">hicolor</h1>
       </div>
-      <div className="flex gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <button 
           onClick={() => fileInputRef.current?.click()}
-          className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-full text-gray-600 transition-all active:scale-90"
+          className="rounded-full bg-gray-50 p-2 text-gray-600 transition-all hover:bg-gray-100 active:scale-90 sm:p-2.5"
           title="上传图片"
         >
           <Upload size={20} />
@@ -1636,11 +1758,12 @@ export default function App() {
         {image && (
           <button 
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-2.5 bg-black hover:bg-gray-800 rounded-full text-white shadow-xl shadow-black/20 transition-all active:scale-95 group"
+            className="group flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-700 active:scale-95 sm:gap-2 sm:px-6 sm:py-2.5"
             title="保存作品"
           >
-            <Download size={20} className="group-hover:translate-y-0.5 transition-transform" />
-            <span className="text-[13px] font-black uppercase tracking-widest">保存作品</span>
+            <Download size={18} className="transition-transform group-hover:translate-y-0.5 sm:size-5" />
+            <span className="text-[11px] font-black uppercase tracking-widest sm:text-[13px]">保存</span>
+            <span className="hidden text-[13px] font-black uppercase tracking-widest sm:inline">作品</span>
           </button>
         )}
       </div>
@@ -1648,7 +1771,7 @@ export default function App() {
   );
 
   const renderBottomNav = () => (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl border-t border-gray-100 pb-safe z-50">
+    <nav ref={bottomNavRef} className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl border-t border-gray-100 pb-safe z-50">
       <div className="flex justify-around items-center h-16 px-4">
         {renderTabButton('background', <Palette size={22} />, '背景')}
         {renderTabButton('elements', <Target size={22} />, '元素')}
@@ -1656,12 +1779,14 @@ export default function App() {
     </nav>
   );
 
-  const renderSettingsPanel = () => (
-    <div className="fixed bottom-16 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-50 z-40 max-h-[45vh] overflow-y-auto custom-scrollbar shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
-      <div className="p-6 pb-10 space-y-8 max-w-2xl mx-auto relative">
+  const renderSettingsPanel = () => {
+    if (!settingsPanelOpen) return null;
+    return (
+    <div ref={settingsPanelRef} className="fixed bottom-16 left-0 right-0 z-40 max-h-[min(52dvh,28rem)] overflow-y-auto border-t border-gray-50 bg-white/95 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.03)] backdrop-blur-xl custom-scrollbar sm:max-h-[45vh]">
+      <div className="relative mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-4 sm:space-y-8 sm:p-6 sm:pb-10">
         <button 
           onClick={() => setActiveTab(null)}
-          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black transition-colors"
+          className="absolute right-2 top-3 z-10 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800 sm:right-4 sm:top-4"
           title="收起面板"
         >
           <X size={20} />
@@ -1675,41 +1800,53 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-8"
             >
-              {/* Layout Mode */}
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">排版模式</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {COMPOSITIONS.map((c) => (
-                    <button
-                      key={c.value}
-                      onClick={() => setComposition(c.value)}
-                      className={`px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
-                        composition === c.value 
-                          ? 'bg-black border-black text-white shadow-lg' 
-                          : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
-                      }`}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
+              {/* Layout Mode — 移动端一行四列 */}
+              <div className="space-y-2 sm:space-y-3 pr-10">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">排版模式</label>
+                <div className="grid w-full grid-cols-4 gap-1.5 sm:gap-2">
+                  {COMPOSITIONS.map((c) => {
+                    const Icon = c.icon;
+                    const active = composition === c.value;
+                    return (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setComposition(c.value)}
+                        className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border px-0.5 py-2 shadow-sm transition-all sm:py-2.5 ${
+                          active
+                            ? 'border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-200/70'
+                            : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
+                        }`}
+                      >
+                        <Icon size={20} strokeWidth={active ? 2.5 : 1.5} className="shrink-0" />
+                        <span className="line-clamp-2 text-center text-[7px] font-bold leading-tight sm:text-[9px]">{c.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Background Type */}
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">底图类型</label>
-                <div className="flex p-1 bg-gray-100 rounded-xl">
-                  {(['solid', 'stripes'] as BackgroundType[]).map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setBgConfig(prev => ({ ...prev, type }))}
-                      className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${
-                        bgConfig.type === type ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                    >
-                      {type === 'solid' ? '纯色' : '条纹'}
-                    </button>
-                  ))}
+              {/* Background Type — 仅文字 */}
+              <div className="space-y-2 sm:space-y-3 pr-10">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">底图类型</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['solid', 'stripes'] as BackgroundType[]).map((type) => {
+                    const active = bgConfig.type === type;
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setBgConfig((prev) => ({ ...prev, type }))}
+                        className={`rounded-2xl border py-3 text-center text-xs font-black shadow-sm transition-all sm:py-3.5 sm:text-sm ${
+                          active
+                            ? 'border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-200/70'
+                            : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
+                        }`}
+                      >
+                        {type === 'solid' ? '纯色' : '条纹'}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1725,7 +1862,7 @@ export default function App() {
                       <button 
                         onClick={() => setPickingTarget(pickingTarget === 'color1' ? null : 'color1')}
                         className={`absolute -top-2 -right-2 p-1.5 rounded-lg shadow-md border transition-all ${
-                          pickingTarget === 'color1' ? 'bg-black text-white border-black scale-110' : 'bg-white text-gray-400 border-gray-100 hover:text-black'
+                          pickingTarget === 'color1' ? 'bg-emerald-100 text-emerald-700 border-emerald-300 scale-110' : 'bg-white text-gray-400 border-gray-100 hover:text-emerald-700'
                         }`}
                       >
                         <Pipette size={12} />
@@ -1741,7 +1878,7 @@ export default function App() {
                         <button 
                           onClick={() => setPickingTarget(pickingTarget === 'color2' ? null : 'color2')}
                           className={`absolute -top-2 -right-2 p-1.5 rounded-lg shadow-md border transition-all ${
-                            pickingTarget === 'color2' ? 'bg-black text-white border-black scale-110' : 'bg-white text-gray-400 border-gray-100 hover:text-black'
+                            pickingTarget === 'color2' ? 'bg-emerald-100 text-emerald-700 border-emerald-300 scale-110' : 'bg-white text-gray-400 border-gray-100 hover:text-emerald-700'
                           }`}
                         >
                           <Pipette size={12} />
@@ -1766,7 +1903,7 @@ export default function App() {
                   <input
                     type="range" min="4" max="200" value={bgConfig.stripeSize}
                     onChange={(e) => setBgConfig(prev => ({ ...prev, stripeSize: Number(e.target.value) }))}
-                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
                   />
                 </div>
               )}
@@ -1776,226 +1913,464 @@ export default function App() {
           {activeTab === 'elements' && (
             <motion.div
               key="elements"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="space-y-6"
             >
               {elementSelectedEditor}
 
-              <div className="grid grid-cols-2 gap-1 p-1.5 bg-gray-100 rounded-2xl mb-4">
-                {(
-                  [
-                    { tab: 'shape' as const, label: '形状' },
-                    { tab: 'overlay' as const, label: '叠字' },
-                  ] as const
-                ).map(({ tab, label }) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setElementsPanelTab(tab)}
-                    className={`py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-[12px] font-black transition-all ${
-                      elementsPanelTab === tab
-                        ? 'bg-white text-gray-900 shadow-md'
-                        : 'text-gray-400 hover:text-gray-600'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <div className="sticky top-0 z-30 -mx-6 px-6 py-2.5 mb-2 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-[0_6px_16px_rgba(255,255,255,0.85)]">
+                <div className="grid grid-cols-2 gap-1 p-1.5 bg-gray-100 rounded-2xl mr-11 sm:mr-12">
+                  {(
+                    [
+                      { tab: 'shape' as const, label: '形状' },
+                      { tab: 'overlay' as const, label: '叠字' },
+                    ] as const
+                  ).map(({ tab, label }) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setElementsPanelTab(tab)}
+                      className={`py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-[12px] font-black transition-all ${
+                        elementsPanelTab === tab
+                          ? 'bg-white text-gray-900 shadow-md'
+                          : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
 
-              {elementsPanelTab === 'shape' ? (
-                <div className="space-y-5">
-                  {elementSelectedEditor}
-
-                  {/* 形状类型（横排网格） */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">形状</label>
-                    <div className="flex flex-wrap gap-2">
-                      {SHAPE_OPTIONS.map(({ value, icon: ShapeIcon, title }) => {
+                {/* 形状类型：与 Tab 同区吸顶；切换形状时自动/手动均立即更新画布（见 onClick 内 setCutouts / generateAutoCutouts） */}
+                {elementsPanelTab === 'shape' && (
+                  <div className="mt-3 pt-3 border-t border-gray-100/90 space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">形状类型</label>
+                    <div className="flex items-start gap-2 overflow-x-auto pb-1 pt-0.5">
+                      {SHAPE_OPTIONS.map(({ value, icon: ShapeIcon, title, caption }) => {
                         const selectedCutout = selectedId ? cutouts.find((c) => c.id === selectedId) : undefined;
                         let activeShapeKind: ShapeKind | null = cutoutConfig.defaultShapeKind;
                         if (selectedCutout) activeShapeKind = selectedCutout.shapeKind ?? null;
                         const active = activeShapeKind !== null && activeShapeKind === value;
                         return (
-                          <button
-                            key={value}
-                            type="button"
-                            title={title}
-                            aria-label={title}
-                            onClick={() => {
-                              if (value === 'symbol') {
-                                setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'symbol' }));
-                                if (selectedId) setCutouts((prev) => prev.map((c) => c.id === selectedId ? { ...c, shapeKind: 'symbol', char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol) } : c));
-                                if (cutoutConfig.creationMode === 'auto') generateAutoCutouts({ defaultShapeKind: 'symbol' });
-                              } else if (value === 'randomLetters') {
-                                setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'randomLetters' }));
-                                if (selectedId) setCutouts((prev) => prev.map((c) => c.id === selectedId ? { ...c, shapeKind: 'randomLetters', char: randomUpperLetter() } : c));
-                                if (cutoutConfig.creationMode === 'auto') generateAutoCutouts({ defaultShapeKind: 'randomLetters' });
-                              } else {
-                                setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: value }));
-                                if (selectedId) setCutouts((prev) => prev.map((c) => c.id === selectedId ? { ...c, shapeKind: value, char: undefined } : c));
-                                if (cutoutConfig.creationMode === 'auto') generateAutoCutouts({ defaultShapeKind: value });
-                              }
-                            }}
-                            className={`w-11 h-11 shrink-0 flex items-center justify-center rounded-full transition-all border ${
-                              active ? 'bg-black border-black text-white shadow-md' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                            }`}
-                          >
-                            <ShapeIcon size={20} strokeWidth={active ? 2.5 : 2} aria-hidden />
-                          </button>
+                          <div key={value} className="flex flex-col items-center gap-2 shrink-0 w-[56px]">
+                            <button
+                              type="button"
+                              title={title}
+                              aria-label={title}
+                              onClick={() => {
+                                // 自动模式：只改 defaultShapeKind 并重新生成，切勿再 setCutouts([]) 与 generate 抢同一批更新，否则易被空数组覆盖导致「画面失效」
+                                if (cutoutConfig.creationMode === 'auto') {
+                                  if (value === 'symbol') {
+                                    setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'symbol' }));
+                                    generateAutoCutouts({ defaultShapeKind: 'symbol' });
+                                  } else if (value === 'randomLetters') {
+                                    setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'randomLetters' }));
+                                    generateAutoCutouts({ defaultShapeKind: 'randomLetters' });
+                                  } else {
+                                    setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: value }));
+                                    generateAutoCutouts({ defaultShapeKind: value });
+                                  }
+                                  return;
+                                }
+                                if (value === 'symbol') {
+                                  setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'symbol' }));
+                                  setCutouts((prev) =>
+                                    prev.map((c) => ({
+                                      ...c,
+                                      shapeKind: 'symbol' as ShapeKind,
+                                      char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
+                                    }))
+                                  );
+                                } else if (value === 'randomLetters') {
+                                  setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'randomLetters' }));
+                                  setCutouts((prev) =>
+                                    prev.map((c) => ({
+                                      ...c,
+                                      shapeKind: 'randomLetters' as ShapeKind,
+                                      char: randomUpperLetter(),
+                                    }))
+                                  );
+                                } else {
+                                  setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: value }));
+                                  setCutouts((prev) =>
+                                    prev.map((c) => ({
+                                      ...c,
+                                      shapeKind: value as ShapeKind,
+                                      char: undefined,
+                                    }))
+                                  );
+                                }
+                              }}
+                              className={`h-14 w-14 shrink-0 flex items-center justify-center rounded-full transition-all ${
+                                active
+                                  ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
+                                  : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
+                              }`}
+                            >
+                              <ShapeIcon size={22} strokeWidth={active ? 2.25 : 1.65} aria-hidden />
+                            </button>
+                            <span
+                              className={`min-h-[2rem] w-full px-0.5 text-center text-[9px] font-black leading-snug tracking-tight ${
+                                active ? 'text-emerald-800' : 'text-gray-600'
+                              }`}
+                            >
+                              {caption}
+                            </span>
+                          </div>
                         );
                       })}
-                    </div>
-                    {cutoutConfig.defaultShapeKind === 'randomLetters' && (
-                      <p className="text-[9px] text-gray-400 font-bold leading-snug px-1">自动生成：点选后立刻随机位置与 A–Z 字母。手动点击：可逐个添加随机字母。</p>
-                    )}
-                    {cutoutConfig.defaultShapeKind === 'symbol' && (
-                      <div className="space-y-2 pt-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">符号内容</label>
-                        <input
-                          type="text"
-                          value={cutoutConfig.customShapeSymbol}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setCutoutConfig((prev) => ({ ...prev, customShapeSymbol: val }));
-                            const g = [...val].filter(Boolean);
-                            if (selectedId) setCutouts((prev) => prev.map((c) => c.id === selectedId && c.shapeKind === 'symbol' ? { ...c, char: g.length ? g[0] : '★' } : c));
-                          }}
-                          className="w-full h-12 px-4 rounded-2xl border border-gray-100 text-lg font-black text-center focus:border-black outline-none bg-white shadow-sm"
-                          placeholder="输入符号，如 ★ ♥ @ …"
-                        />
-                      </div>
-                    )}
-                  </div>
 
-                  {/* 散落数量滑块 */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">散落</label>
-                      <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.scatterCount}</span>
-                    </div>
-                    <input
-                      type="range" min="1" max="12" step="1"
-                      value={cutoutConfig.scatterCount}
-                      onChange={(e) => setCutoutConfig((prev) => ({ ...prev, scatterCount: Number(e.target.value) }))}
-                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
-                    />
-                  </div>
+                      {cutoutConfig.defaultShapeKind === 'symbol' && (
+                        <div className="flex flex-col items-center gap-2 shrink-0 w-[88px]">
+                          <input
+                            type="text"
+                            value={cutoutConfig.customShapeSymbol}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCutoutConfig((prev) => ({ ...prev, customShapeSymbol: val }));
+                              const g = [...val].filter(Boolean);
+                              setCutouts((prev) =>
+                                prev.map((c) =>
+                                  c.shapeKind === 'symbol'
+                                    ? { ...c, char: g.length ? pickRandomSymbolChar(val) : '★' }
+                                    : c
+                                )
+                              );
+                            }}
+                            className="h-14 w-full max-w-[5.5rem] shrink-0 px-2 rounded-full border border-gray-200 text-sm font-black text-center focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none bg-white shadow-sm"
+                            placeholder="符号"
+                            aria-label="自定义符号池"
+                          />
+                          <span className="min-h-[2rem] w-full text-center text-[9px] font-black leading-snug text-gray-600">符号池</span>
+                        </div>
+                      )}
+                      {cutoutConfig.defaultShapeKind === 'randomLetters' && (
+                        <div className="flex flex-col items-center gap-2 shrink-0 w-[56px]">
+                          <span className="h-14 w-14 flex items-center justify-center text-[10px] font-black text-gray-500 bg-gray-50/90 ring-1 ring-gray-100 rounded-full">A–Z</span>
+                          <span className="min-h-[2rem] w-full text-center text-[9px] font-black leading-snug text-gray-600">随机字母</span>
+                        </div>
+                      )}
 
-                  {/* 基础大小 */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">大小</label>
-                      <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.baseSize}</span>
-                    </div>
-                    <input
-                      type="range" min="4" max="200"
-                      value={cutoutConfig.baseSize}
-                      onChange={(e) => setCutoutConfig((prev) => ({ ...prev, baseSize: Number(e.target.value) }))}
-                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
-                    />
-                  </div>
+                      <div className="w-px shrink-0 self-stretch min-h-[5.5rem] bg-gray-100" aria-hidden />
 
-                  {/* 随机差异 */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">随机</label>
-                      <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.variation}</span>
-                    </div>
-                    <input
-                      type="range" min="0" max="10" step="0.5"
-                      value={cutoutConfig.variation}
-                      onChange={(e) => setCutoutConfig((prev) => ({ ...prev, variation: Number(e.target.value) }))}
-                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
-                    />
-                  </div>
-
-                  {/* 数量 + 形状颜色 */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className={`space-y-2 ${cutoutConfig.creationMode === 'manual' ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <div className="flex justify-between items-end">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">数量</label>
-                        <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.autoCount}</span>
-                      </div>
-                      <input
-                        type="range" min="1" max="80" step="1"
-                        value={cutoutConfig.autoCount}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          setCutoutConfig((prev) => ({ ...prev, autoCount: next }));
-                          if (cutoutConfig.creationMode === 'auto' && image) generateAutoCutouts({ autoCount: next });
-                        }}
-                        className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">色块填色</label>
-                      <div className="relative h-10 rounded-xl overflow-hidden border border-gray-100 shadow-sm" style={{ backgroundColor: cutoutConfig.shapeColor }}>
-                        <input
-                          type="color" value={cutoutConfig.shapeColor}
-                          onChange={(e) => setCutoutConfig((prev) => ({ ...prev, shapeColor: e.target.value }))}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 分布模式 */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">分布</label>
-                    <div className="flex gap-2">
-                      {(['sync', 'scatter'] as DistributionMode[]).map((mode) => (
+                      <div className="flex flex-col items-center gap-2 shrink-0 w-[56px]">
                         <button
-                          key={mode}
                           type="button"
-                          onClick={() => setCutoutConfig((prev) => ({ ...prev, distributionMode: mode }))}
-                          className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
-                            cutoutConfig.distributionMode === mode
-                              ? 'bg-black border-black text-white shadow-md'
-                              : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'
-                          }`}
-                        >
-                          {mode === 'sync' ? '对称' : '打散'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 生成方式 */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">生成</label>
-                    <div className="flex gap-2">
-                      {(['auto', 'manual'] as CreationMode[]).map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
+                          title="取消形状"
+                          aria-label="取消形状"
                           onClick={() => {
-                            setCutoutConfig((prev) => ({ ...prev, creationMode: mode }));
-                            if (mode === 'auto' && cutouts.length === 0) generateAutoCutouts();
+                            setCutouts([]);
+                            setSelectedId(null);
                           }}
-                          className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
-                            cutoutConfig.creationMode === mode
-                              ? 'bg-black border-black text-white shadow-md'
-                              : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'
+                          className="h-14 w-14 shrink-0 flex items-center justify-center rounded-full bg-gray-50/90 text-gray-400 ring-1 ring-gray-100 hover:bg-red-50 hover:text-red-500 transition-all"
+                        >
+                          <X size={20} strokeWidth={1.85} />
+                        </button>
+                        <span className="min-h-[2rem] w-full text-center text-[9px] font-black leading-snug text-gray-600 px-0.5">取消形状</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {elementsPanelTab === 'shape' ? (
+                <div className="space-y-5">
+                  {/* 选中形状编辑器仅在上方 elementSelectedEditor 渲染一份，避免重复 */}
+
+                  {/* 形状调整：参考图二 — 圆环内「线稿图标 + 数值」，圆环外底部加粗标签；展开区在整行下方 */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-gray-400 tracking-[0.2em]">形状调整</p>
+
+                    <div className="-mx-1 flex items-start gap-2 overflow-x-auto overflow-y-visible px-2 pb-2 pt-1 sm:-mx-0 sm:px-0">
+                      {/* 形状大小 */}
+                      <div className="flex w-[5rem] min-w-[5rem] shrink-0 flex-col items-center gap-2">
+                        <button
+                          type="button"
+                          title="形状大小"
+                          aria-label="形状大小"
+                          onClick={() => setExpandedSlider(expandedSlider === 'baseSize' ? null : 'baseSize')}
+                          className={`h-[4.25rem] w-[4.25rem] shrink-0 flex flex-col items-center justify-center gap-1 rounded-full transition-all ${
+                            expandedSlider === 'baseSize'
+                              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
+                              : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
                           }`}
                         >
-                          {mode === 'auto' ? '自动' : '手动'}
+                          <span className="relative inline-flex text-current" aria-hidden>
+                            <Images size={17} strokeWidth={expandedSlider === 'baseSize' ? 2.2 : 1.65} />
+                            <Sparkles
+                              className="absolute -bottom-px -right-px text-current"
+                              size={9}
+                              strokeWidth={expandedSlider === 'baseSize' ? 2.4 : 1.85}
+                            />
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-bold tabular-nums leading-none ${
+                              expandedSlider === 'baseSize' ? 'text-white' : 'text-gray-400'
+                            }`}
+                          >
+                            {cutoutConfig.baseSize}
+                          </span>
                         </button>
-                      ))}
+                        <span
+                          className={`min-h-[2.25rem] w-full text-center text-[8px] font-black leading-snug tracking-tight sm:text-[9px] ${
+                            expandedSlider === 'baseSize' ? 'text-emerald-800' : 'text-gray-700'
+                          }`}
+                        >
+                          形状大小
+                        </span>
+                      </div>
+
+                      {/* 形状数量 */}
+                      <div className={`flex w-[5rem] min-w-[5rem] shrink-0 flex-col items-center gap-2 ${cutoutConfig.creationMode === 'manual' ? 'opacity-45 pointer-events-none' : ''}`}>
+                        <button
+                          type="button"
+                          title="形状数量"
+                          aria-label="形状数量"
+                          onClick={() => cutoutConfig.creationMode === 'auto' && setExpandedSlider(expandedSlider === 'autoCount' ? null : 'autoCount')}
+                          className={`h-[4.25rem] w-[4.25rem] shrink-0 flex flex-col items-center justify-center gap-1 rounded-full transition-all ${
+                            expandedSlider === 'autoCount' && cutoutConfig.creationMode === 'auto'
+                              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
+                              : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
+                          }`}
+                        >
+                          <span className="relative inline-flex text-current" aria-hidden>
+                            <ImageIcon size={17} strokeWidth={expandedSlider === 'autoCount' && cutoutConfig.creationMode === 'auto' ? 2.2 : 1.65} />
+                            <Sparkles
+                              className="absolute -right-0.5 -top-0.5 text-current"
+                              size={9}
+                              strokeWidth={expandedSlider === 'autoCount' && cutoutConfig.creationMode === 'auto' ? 2.4 : 1.85}
+                            />
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-bold tabular-nums leading-none ${
+                              expandedSlider === 'autoCount' && cutoutConfig.creationMode === 'auto' ? 'text-white' : 'text-gray-400'
+                            }`}
+                          >
+                            {cutoutConfig.autoCount}
+                          </span>
+                        </button>
+                        <span
+                          className={`min-h-[2.25rem] w-full text-center text-[8px] font-black leading-snug tracking-tight sm:text-[9px] ${
+                            expandedSlider === 'autoCount' && cutoutConfig.creationMode === 'auto' ? 'text-emerald-800' : 'text-gray-700'
+                          }`}
+                        >
+                          形状数量
+                        </span>
+                      </div>
+
+                      {/* 随机差异 */}
+                      <div className="flex w-[5rem] min-w-[5rem] shrink-0 flex-col items-center gap-2">
+                        <button
+                          type="button"
+                          title="随机差异"
+                          aria-label="随机差异"
+                          onClick={() => setExpandedSlider(expandedSlider === 'variation' ? null : 'variation')}
+                          className={`h-[4.25rem] w-[4.25rem] shrink-0 flex flex-col items-center justify-center gap-1 rounded-full transition-all ${
+                            expandedSlider === 'variation'
+                              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
+                              : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
+                          }`}
+                        >
+                          <Sun size={17} strokeWidth={expandedSlider === 'variation' ? 2.2 : 1.65} aria-hidden />
+                          <span
+                            className={`text-[10px] font-mono font-bold tabular-nums leading-none ${
+                              expandedSlider === 'variation' ? 'text-white' : 'text-gray-400'
+                            }`}
+                          >
+                            {cutoutConfig.variation}
+                          </span>
+                        </button>
+                        <span
+                          className={`min-h-[2.25rem] w-full text-center text-[8px] font-black leading-snug tracking-tight sm:text-[9px] ${
+                            expandedSlider === 'variation' ? 'text-emerald-800' : 'text-gray-700'
+                          }`}
+                        >
+                          随机差异
+                        </span>
+                      </div>
+
+                      {/* 形状填色 */}
+                      <div className="flex w-[5rem] min-w-[5rem] shrink-0 flex-col items-center gap-2">
+                        <button
+                          type="button"
+                          title="形状填色"
+                          aria-label="形状填色"
+                          onClick={() => setExpandedSlider(expandedSlider === 'shapeColor' ? null : 'shapeColor')}
+                          className={`h-[4.25rem] w-[4.25rem] shrink-0 flex flex-col items-center justify-center gap-1 rounded-full transition-all ${
+                            expandedSlider === 'shapeColor'
+                              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
+                              : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
+                          }`}
+                        >
+                          <PaintBucket size={17} strokeWidth={expandedSlider === 'shapeColor' ? 2.2 : 1.65} aria-hidden />
+                          <span
+                            className={`h-3 w-3 rounded-full border-2 ${
+                              expandedSlider === 'shapeColor' ? 'border-white' : 'border-gray-300'
+                            }`}
+                            style={{ backgroundColor: cutoutConfig.shapeColor }}
+                          />
+                        </button>
+                        <span
+                          className={`min-h-[2.25rem] w-full text-center text-[8px] font-black leading-snug tracking-tight sm:text-[9px] ${
+                            expandedSlider === 'shapeColor' ? 'text-emerald-800' : 'text-gray-700'
+                          }`}
+                        >
+                          形状填色
+                        </span>
+                      </div>
+
+                      {/* 元素对称 */}
+                      <div className="flex w-[5rem] min-w-[5rem] shrink-0 flex-col items-center gap-2">
+                        <button
+                          type="button"
+                          title="元素对称"
+                          aria-label="元素对称"
+                          onClick={() => setExpandedSlider(expandedSlider === 'distributionMode' ? null : 'distributionMode')}
+                          className={`h-[4.25rem] w-[4.25rem] shrink-0 flex flex-col items-center justify-center gap-1 rounded-full transition-all ${
+                            expandedSlider === 'distributionMode'
+                              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
+                              : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
+                          }`}
+                        >
+                          <span className="relative inline-flex h-[17px] w-[17px] items-center justify-center text-current" aria-hidden>
+                            <Clock size={17} strokeWidth={expandedSlider === 'distributionMode' ? 2.2 : 1.65} />
+                            <span
+                              className={`pointer-events-none absolute bottom-[-3px] right-[-2px] text-[5px] font-black leading-none tracking-tighter ${
+                                expandedSlider === 'distributionMode' ? 'text-white' : 'text-gray-500'
+                              }`}
+                            >
+                              HD
+                            </span>
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-bold leading-none ${
+                              expandedSlider === 'distributionMode' ? 'text-white' : 'text-gray-400'
+                            }`}
+                          >
+                            {cutoutConfig.distributionMode === 'sync' ? '是' : '否'}
+                          </span>
+                        </button>
+                        <span
+                          className={`min-h-[2.25rem] w-full text-center text-[8px] font-black leading-snug tracking-tight sm:text-[9px] ${
+                            expandedSlider === 'distributionMode' ? 'text-emerald-800' : 'text-gray-700'
+                          }`}
+                        >
+                          元素对称
+                        </span>
+                      </div>
+
+                      {/* 手动添加 */}
+                      <div className="flex w-[5rem] min-w-[5rem] shrink-0 flex-col items-center gap-2">
+                        <button
+                          type="button"
+                          title="手动添加"
+                          aria-label="手动添加"
+                          onClick={() => {
+                            const next = cutoutConfig.creationMode === 'manual' ? 'auto' : 'manual';
+                            setCutoutConfig((prev) => ({ ...prev, creationMode: next }));
+                            if (next === 'auto' && cutouts.length === 0) generateAutoCutouts();
+                          }}
+                          className={`h-[4.25rem] w-[4.25rem] shrink-0 flex flex-col items-center justify-center gap-1 rounded-full transition-all ${
+                            cutoutConfig.creationMode === 'manual'
+                              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
+                              : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
+                          }`}
+                        >
+                          <Triangle size={17} strokeWidth={cutoutConfig.creationMode === 'manual' ? 2.2 : 1.65} aria-hidden />
+                          <span
+                            className={`text-[10px] font-mono font-bold leading-none ${
+                              cutoutConfig.creationMode === 'manual' ? 'text-white' : 'text-gray-400'
+                            }`}
+                          >
+                            {cutoutConfig.creationMode === 'manual' ? '开' : '关'}
+                          </span>
+                        </button>
+                        <span
+                          className={`min-h-[2.25rem] w-full text-center text-[8px] font-black leading-snug tracking-tight sm:text-[9px] ${
+                            cutoutConfig.creationMode === 'manual' ? 'text-emerald-800' : 'text-gray-700'
+                          }`}
+                        >
+                          手动添加
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 展开区：与当前选中项对齐的整行控件 */}
+                    <div className="space-y-2 pt-1">
+                      {expandedSlider === 'baseSize' && (
+                        <input
+                          type="range"
+                          min="4"
+                          max="200"
+                          value={cutoutConfig.baseSize}
+                          onChange={(e) => setCutoutConfig((prev) => ({ ...prev, baseSize: Number(e.target.value) }))}
+                          className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
+                        />
+                      )}
+                      {expandedSlider === 'autoCount' && cutoutConfig.creationMode === 'auto' && (
+                        <input
+                          type="range"
+                          min="1"
+                          max="80"
+                          step="1"
+                          value={cutoutConfig.autoCount}
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            setCutoutConfig((prev) => ({ ...prev, autoCount: next }));
+                            if (image) generateAutoCutouts({ autoCount: next });
+                          }}
+                          className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
+                        />
+                      )}
+                      {expandedSlider === 'variation' && (
+                        <input
+                          type="range"
+                          min="0"
+                          max="10"
+                          step="0.5"
+                          value={cutoutConfig.variation}
+                          onChange={(e) => setCutoutConfig((prev) => ({ ...prev, variation: Number(e.target.value) }))}
+                          className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
+                        />
+                      )}
+                      {expandedSlider === 'shapeColor' && (
+                        <div className="relative h-9 rounded-xl overflow-hidden border border-gray-100" style={{ backgroundColor: cutoutConfig.shapeColor }}>
+                          <input
+                            type="color"
+                            value={cutoutConfig.shapeColor}
+                            onChange={(e) => setCutoutConfig((prev) => ({ ...prev, shapeColor: e.target.value }))}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                        </div>
+                      )}
+                      {expandedSlider === 'distributionMode' && (
+                        <div className="flex gap-2">
+                          {(['sync', 'scatter'] as DistributionMode[]).map((mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => setCutoutConfig((prev) => ({ ...prev, distributionMode: mode }))}
+                              className={`flex-1 py-2.5 rounded-2xl text-[10px] font-black transition-all ${
+                                cutoutConfig.distributionMode === mode
+                                  ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-400 shadow-sm'
+                                  : 'bg-gray-50/80 text-gray-600 border border-gray-200 hover:bg-gray-100/80'
+                              }`}
+                            >
+                              {mode === 'sync' ? '对称（是）' : '打散（否）'}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* 操作按钮 */}
-                  <div className="flex gap-3">
+                  {/* 第三行：重新生成 */}
+                  <div className="flex gap-2">
                     <button type="button" onClick={generateAutoCutouts}
-                      className="flex-1 flex items-center justify-center gap-2 bg-black text-white py-4 rounded-2xl transition-all text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-95">
+                      className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-4 rounded-2xl transition-all text-[11px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95">
                       <RefreshCw size={16} /><span>重新生成</span>
-                    </button>
-                    <button type="button" onClick={() => { setCutouts([]); setSelectedId(null); }}
-                      className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-600 py-4 rounded-2xl transition-all text-[11px] font-black uppercase tracking-widest active:scale-95">
-                      <Trash2 size={16} /><span>清空</span>
                     </button>
                   </div>
 
@@ -2012,25 +2387,27 @@ export default function App() {
         </AnimatePresence>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] font-sans selection:bg-black selection:text-white overflow-hidden">
+    <div className="min-h-screen bg-[#fafafa] font-sans selection:bg-emerald-100 selection:text-emerald-900 overflow-hidden">
       {renderHeader()}
       
       <main
-        className={`fixed inset-0 pt-16 pb-16 overflow-hidden flex items-center justify-center ${
+        className={`fixed inset-0 overflow-hidden pb-16 pt-14 flex items-center justify-center sm:pt-16 ${
           pickingTarget ? 'cursor-crosshair' : ''
         }`}
       >
-        <div className={`w-full h-full overflow-auto flex flex-col items-center justify-center p-2 sm:p-4 md:p-12 custom-scrollbar`}
-          style={{ maxWidth: '100vw', maxHeight: 'calc(100vh - 8rem)' }}
+        <div
+          className={`custom-scrollbar flex h-full w-full max-w-[100vw] flex-col items-center justify-center overflow-auto p-2 sm:p-4 md:p-12`}
+          style={{ maxHeight: 'calc(100dvh - 7rem - env(safe-area-inset-top, 0px))' }}
         >
           {image && cutoutConfig.creationMode === 'manual' && (
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-4 px-4 py-1.5 bg-black/5 backdrop-blur-md rounded-full border border-black/5 flex items-center gap-2"
+              className="mb-4 px-4 py-1.5 bg-emerald-50/80 backdrop-blur-md rounded-full border border-emerald-100/80 flex items-center gap-2"
             >
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
               <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">手动点击模式: 点击画布添加元素</span>
@@ -2043,12 +2420,12 @@ export default function App() {
               className="text-center space-y-10"
             >
               <div className="relative inline-block">
-                <div className="absolute -inset-10 bg-black/5 blur-3xl rounded-full" />
+                <div className="absolute -inset-10 bg-emerald-100/30 blur-3xl rounded-full" />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="relative w-80 h-56 border-2 border-dashed border-gray-200 rounded-[3rem] flex flex-col items-center justify-center space-y-5 bg-white/80 hover:bg-white hover:border-black hover:shadow-2xl transition-all duration-500 group"
+                  className="relative mx-auto flex h-52 w-full max-w-sm flex-col items-center justify-center space-y-5 rounded-[2.5rem] border-2 border-dashed border-gray-200 bg-white/80 transition-all duration-500 hover:border-emerald-400 hover:bg-white hover:shadow-2xl group sm:h-56 sm:rounded-[3rem]"
                 >
-                  <div className="w-16 h-16 rounded-3xl bg-gray-50 flex items-center justify-center group-hover:bg-black group-hover:rotate-12 transition-all duration-500">
+                  <div className="w-16 h-16 rounded-3xl bg-gray-50 flex items-center justify-center text-gray-600 group-hover:bg-emerald-100 group-hover:text-emerald-700 group-hover:rotate-12 transition-all duration-500">
                     <Upload className="w-7 h-7 text-gray-400 group-hover:text-white" />
                   </div>
                   <div className="space-y-2">
@@ -2064,22 +2441,26 @@ export default function App() {
               animate={{ 
                 opacity: 1, 
                 scale: 1,
-                y: activeTab ? -(window.innerHeight * 0.4) / 2 : 0
+                y: settingsPanelOpen ? -(window.innerHeight * 0.4) / 2 : 0
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={`flex ${
                 composition === 'block-bottom' ? 'flex-col' :
                 composition === 'block-top' ? 'flex-col-reverse' :
                 composition === 'block-right' ? 'flex-row' : 'flex-row-reverse'
-              } shadow-[0_40px_100px_-20px_rgba(0,0,0,0.2)] items-center gap-0 p-0 overflow-visible bg-white flex-shrink-0`}
+              } shadow-[0_40px_100px_-20px_rgba(0,0,0,0.2)] items-stretch justify-center gap-0 p-0 overflow-visible bg-white flex-shrink-0`}
               style={{
                 width: (composition === 'block-bottom' || composition === 'block-top' ? image.width : image.width * 2) * zoom,
                 height: (composition === 'block-bottom' || composition === 'block-top' ? image.height * 2 : image.height) * zoom,
                 maxWidth: 'min(100vw - 1rem, 100%)',
-                maxHeight: 'min(100vh - 8rem, 100%)',
+                maxHeight: 'min(calc(100dvh - 7rem - env(safe-area-inset-top, 0px)), 100%)',
               }}
             >
-              <div className="relative leading-[0]">
+              {/* 主图与色块必须同宽同高（各为 image×zoom），勿用 100%+contain，否则 flex 下左右两半占位不一致 */}
+              <div
+                className="relative shrink-0 leading-[0]"
+                style={{ width: image.width * zoom, height: image.height * zoom }}
+              >
                 <canvas
                   ref={mainCanvasRef}
                   onMouseDown={handleCanvasMouseDown}
@@ -2087,7 +2468,7 @@ export default function App() {
                   onMouseUp={handleCanvasMouseUp}
                   onMouseLeave={handleCanvasMouseUp}
                   className={`block p-0 m-0 border-none ${isDraggingImage ? 'cursor-grabbing' : 'cursor-grab'}`}
-                  style={{ width: '100%', height: '100%', maxWidth: image.width * zoom, maxHeight: image.height * zoom, aspectRatio: `${image.width}/${image.height}`, objectFit: 'contain' }}
+                  style={{ width: image.width * zoom, height: image.height * zoom, display: 'block' }}
                 />
                 {selectedId && (() => {
                   const c = cutouts.find((x) => x.id === selectedId);
@@ -2097,7 +2478,7 @@ export default function App() {
                     (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (iw / 800);
                   const boxPx = currentSize * zoom;
                   const handleCls =
-                    'absolute w-4 h-4 bg-white border-2 border-black rounded-full shadow-md pointer-events-auto touch-none z-20';
+                    'absolute w-4 h-4 bg-white border-2 border-emerald-500 rounded-full shadow-md pointer-events-auto touch-none z-20';
                   return (
                     <div className="absolute inset-0 pointer-events-none z-10 overflow-visible">
                       <div
@@ -2179,7 +2560,10 @@ export default function App() {
                 })()}
 
               </div>
-              <div className="relative leading-[0]">
+              <div
+                className="relative shrink-0 leading-[0]"
+                style={{ width: image.width * zoom, height: image.height * zoom }}
+              >
                 <canvas
                   ref={blockCanvasRef}
                   onMouseDown={handleBlockCanvasMouseDown}
