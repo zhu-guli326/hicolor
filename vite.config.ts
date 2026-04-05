@@ -5,9 +5,9 @@ import {defineConfig, loadEnv} from 'vite';
 
 /**
  * Vercel 部署在根路径；GitHub Pages 部署在 /hicolor/ 子路径。
- * Vercel 会设置 VERCEL=true 环境变量。
+ * Vercel 构建时会注入 VERCEL（官方文档值为 "1"），不是字符串 "true"。
  */
-const isVercel = process.env.VERCEL === 'true';
+const isVercel = Boolean(process.env.VERCEL);
 const BASE = isVercel ? '/' : '/hicolor/';
 
 /**
