@@ -4,20 +4,16 @@ import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 
 /**
- * Vercel 部署在根路径；GitHub Pages 部署在 /hicolor/ 子路径。
- * Vercel 构建时会注入 VERCEL（官方文档值为 "1"），不是字符串 "true"。
+ * 仅在生产构建且运行在 Vercel 上时用根路径 base。
+ * 本地 `vite` 开发时即使误设了环境变量 VERCEL，也必须保持 /hicolor/，否则打开 /hicolor/ 会白屏。
  */
-const isVercel = Boolean(process.env.VERCEL);
-const BASE = isVercel ? '/' : '/hicolor/';
-
-/**
- * 本地开发时：若项目路径不是 /hicolor/，重定向到 /hicolor/（与 GitHub Pages 保持一致）。
- * Vercel 部署时跳过此重定向，直接使用根路径。
- */
-const shouldRedirectRoot = !isVercel;
-
-export default defineConfig(({mode}) => {
+export default defineConfig(({mode, command}) => {
   const env = loadEnv(mode, '.', '');
+  const isVercelProductionBuild = command === 'build' && Boolean(process.env.VERCEL);
+  const BASE = isVercelProductionBuild ? '/' : '/hicolor/';
+  /** 开发服务器：根路径重定向到 /hicolor/ */
+  const shouldRedirectRoot = command === 'serve';
+
   return {
     base: BASE,
     plugins: [
