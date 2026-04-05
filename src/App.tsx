@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React, { useState, useRef, useEffect, useCallback, ChangeEvent } from 'react';
 import heic2any from 'heic2any';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -21,7 +22,7 @@ import {
   Droplet,
   Snowflake,
   Heart,
-  Hash,
+  Plus,
   CaseUpper,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -34,10 +35,8 @@ type CompositionMode = 'block-bottom' | 'block-top' | 'block-left' | 'block-righ
 type BackgroundType = 'solid' | 'stripes';
 type CreationMode = 'auto' | 'manual';
 type DistributionMode = 'sync' | 'scatter';
-type ElementCategory = 'shape' | 'custom';
-
-/** 元素面板内：形状挖空 / 文字字符池 / 画布叠字 */
-type ElementsPanelTab = 'shape' | 'cutoutText' | 'overlay';
+/** 元素面板内：形状挖空 / 画布叠字 */
+type ElementsPanelTab = 'shape' | 'overlay';
 type ShapeKind =
   | 'circle'
   | 'square'
@@ -57,15 +56,6 @@ interface Cutout {
   angle: number;
   char?: string;
   shapeKind?: ShapeKind;
-}
-
-/** 叠加字母串：主图为白字，色块区为照片填充字（与参考图一致） */
-interface StringLetter {
-  char: string;
-  x: number;
-  y: number;
-  sizeFactor: number;
-  angle: number;
 }
 
 /** 画布叠字字体预设（已在 index.html 中加载） */
@@ -119,8 +109,8 @@ const SHAPE_OPTIONS: { value: ShapeKind; icon: LucideIcon; title: string }[] = [
   { value: 'drop', icon: Droplet, title: '水滴' },
   { value: 'snowflake', icon: Snowflake, title: '雪花' },
   { value: 'heart', icon: Heart, title: '爱心' },
-  { value: 'symbol', icon: Hash, title: '自定义符号' },
   { value: 'randomLetters', icon: CaseUpper, title: '随机字母' },
+  { value: 'symbol', icon: Plus, title: '自定义符号' },
 ];
 
 function pickRandomSymbolChar(s: string): string {
@@ -142,36 +132,12 @@ function isGlyphShapeKind(kind: ShapeKind | undefined): boolean {
   return kind === 'symbol' || kind === 'randomLetters';
 }
 
-/** 随机 26 个大写字母拼接（每位独立随机） */
-function randomAlphaString26(): string {
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  let s = '';
-  for (let i = 0; i < 26; i++) {
-    s += letters[Math.floor(Math.random() * letters.length)];
-  }
-  return s;
-}
-
 /** iOS / iPadOS：Safari 对 <a download>、data: 新窗口支持差，需分享或新开 blob 页长按保存 */
 function isLikelyIOS(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
   if (/iPad|iPhone|iPod/i.test(ua)) return true;
   return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-}
-
-function overlayCharsForScatter(raw: string): string[] {
-  const t = raw.replace(/\s/g, '');
-  if (!t) return [];
-  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-    try {
-      const seg = new Intl.Segmenter('zh', { granularity: 'grapheme' });
-      return Array.from(seg.segment(t), (s) => s.segment);
-    } catch {
-      /* ignore */
-    }
-  }
-  return [...t];
 }
 
 function wrapOverlayLines(
@@ -203,9 +169,11 @@ function computeOverlayLineLayout(
   imgWidth: number,
   imgHeight: number,
   baseFontCanvasPx: number,
-  fontFamily: string
+  fontFamily: string,
+  ox: number,
+  oy: number
 ): { fontSize: number; lines: string[]; lh: number; startY: number; cx: number } {
-  const cx = imgWidth / 2;
+  const cx = ox * imgWidth;
   const maxW = imgWidth * 0.88;
   const maxBlockH = imgHeight * 0.4;
   let fontSize = Math.max(14, baseFontCanvasPx);
@@ -221,7 +189,7 @@ function computeOverlayLineLayout(
     fontSize *= 0.9;
     if (fontSize < 11) break;
   }
-  const cy = imgHeight * 0.42;
+  const cy = oy * imgHeight;
   const startY = cy - ((lines.length - 1) * lh) / 2;
   return { fontSize, lines, lh, startY, cx };
 }
@@ -252,9 +220,10 @@ function addShapePath(ctx: CanvasRenderingContext2D, kind: ShapeKind, size: numb
       break;
     }
     case 'drop': {
+      // 底部控制点与底点同高，保证底部切线水平 → 圆润水滴底；否则会出现上下双尖菱形
       ctx.moveTo(0, -r);
-      ctx.bezierCurveTo(r * 0.95, -r * 0.15, r * 0.55, r * 0.5, 0, r);
-      ctx.bezierCurveTo(-r * 0.55, r * 0.5, -r * 0.95, -r * 0.15, 0, -r);
+      ctx.bezierCurveTo(r * 0.78, -r * 0.38, r * 0.92, r, 0, r);
+      ctx.bezierCurveTo(-r * 0.92, r, -r * 0.78, -r * 0.38, 0, -r);
       ctx.closePath();
       break;
     }
@@ -307,7 +276,6 @@ export default function App() {
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [pickingTarget, setPickingTarget] = useState<'color1' | 'color2' | null>(null);
-  const [elementCategory, setElementCategory] = useState<ElementCategory>('shape');
   const [elementsPanelTab, setElementsPanelTab] = useState<ElementsPanelTab>('shape');
 
   // 1. Canvas Configuration
@@ -371,7 +339,6 @@ export default function App() {
     autoCount: 10,
     creationMode: 'auto' as CreationMode,
     distributionMode: 'sync' as DistributionMode,
-    defaultChar: 'A',
     defaultShapeKind: 'circle' as ShapeKind,
     /** 形状类型为「符号」时：可输入多个字符，生成时随机取其一 */
     customShapeSymbol: '★♥●',
@@ -380,90 +347,21 @@ export default function App() {
   });
 
   const [overlayTextConfig, setOverlayTextConfig] = useState({
-    /** 默认不叠字；在「文字」里输入后才会画到画布上 */
     content: '',
-    /** false：整句排版；true：去掉空白后逐字拆散到画面上 */
-    scattered: false,
     fontSize: 52,
     fontFamily: '"Noto Sans SC", sans-serif',
     fillColor: '#ffffff',
+    /** 叠字在画面中的相对位置 (0–1)，默认居中 */
+    x: 0.5,
+    y: 0.5,
   });
-  const [stringLetters, setStringLetters] = useState<StringLetter[]>([]);
-  /** 元素「文字」里展示的随机 26 字母串，可与下方输入联动 */
-  const [randomLetterPool26, setRandomLetterPool26] = useState(randomAlphaString26);
   const overlayTextConfigRef = useRef(overlayTextConfig);
   overlayTextConfigRef.current = overlayTextConfig;
 
-  /** 拆散模式下的字号参差，仅内部使用 */
-  const scatterVariation = 2;
-
-  const regenerateStringLetters = useCallback(() => {
-    const cfg = overlayTextConfigRef.current;
-    if (!image || !cfg.scattered) {
-      setStringLetters([]);
-      return;
-    }
-    const chars = overlayCharsForScatter(cfg.content);
-    if (chars.length === 0) {
-      setStringLetters([]);
-      return;
-    }
-    const { fontSize: baseSize } = cfg;
-    const variation = scatterVariation;
-    const refW = 800;
-    const letters: StringLetter[] = [];
-    const maxAttempts = 120;
-
-    for (let i = 0; i < chars.length; i++) {
-      const ch = chars[i];
-      let placed = false;
-      let attempts = 0;
-      while (!placed && attempts < maxAttempts) {
-        const x = Math.random();
-        const y = Math.random();
-        const dxCenter = x - 0.5;
-        const dyCenter = y - 0.5;
-        const distFromCenter = Math.sqrt(dxCenter * dxCenter + dyCenter * dyCenter);
-        const keepProb = Math.pow(distFromCenter / 0.5, 1.2);
-        if (Math.random() > keepProb && attempts < maxAttempts / 2) {
-          attempts++;
-          continue;
-        }
-
-        const sizeFactor = Math.random() - 0.5;
-        const currentSize = baseSize + sizeFactor * variation * 10;
-        const angle = (Math.random() - 0.5) * Math.PI * 1.4;
-
-        const collision = letters.some((other) => {
-          const otherSize = baseSize + other.sizeFactor * variation * 10;
-          const dx = (x - other.x) * refW;
-          const dy = (y - other.y) * refW * (image.height / image.width);
-          const d = Math.sqrt(dx * dx + dy * dy);
-          return d < (currentSize + otherSize) / 2 + 14;
-        });
-
-        if (!collision) {
-          letters.push({ char: ch, x, y, sizeFactor, angle });
-          placed = true;
-        }
-        attempts++;
-      }
-      if (!placed) {
-        letters.push({
-          char: ch,
-          x: 0.12 + ((i * 37) % 76) / 100,
-          y: 0.18 + ((i * 53) % 64) / 100,
-          sizeFactor: Math.random() - 0.5,
-          angle: (Math.random() - 0.5) * Math.PI,
-        });
-      }
-    }
-    setStringLetters(letters);
-  }, [image]);
-
-  useEffect(() => {
-    regenerateStringLetters();
-  }, [image, overlayTextConfig.content, overlayTextConfig.scattered, overlayTextConfig.fontSize, regenerateStringLetters]);
+  const [isDraggingOverlay, setIsDraggingOverlay] = useState(false);
+  const [isResizingOverlay, setIsResizingOverlay] = useState(false);
+  const overlayDragStartRef = useRef({ mouseX: 0, mouseY: 0, ox: 0, oy: 0 });
+  const overlayResizeStartRef = useRef({ mouseY: 0, fontSize: 0 });
 
   // --- Refs ---
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -482,8 +380,11 @@ export default function App() {
   } | null>(null);
 
   // Logic
-  const generateAutoCutouts = useCallback(() => {
+  const generateAutoCutouts = useCallback(
+    (opts?: { defaultShapeKind?: ShapeKind; autoCount?: number }) => {
     const { autoCount, baseSize, variation } = cutoutConfig;
+    const count = Math.max(1, Math.round(opts?.autoCount ?? autoCount));
+    const dkForGen = opts?.defaultShapeKind ?? cutoutConfig.defaultShapeKind;
     const newCutouts: Cutout[] = [];
     const maxAttempts = 100;
     
@@ -491,7 +392,7 @@ export default function App() {
     const refW = 800;
     const refH = image ? (image.height / image.width) * refW : 800;
 
-    for (let i = 0; i < autoCount; i++) {
+    for (let i = 0; i < count; i++) {
       let placed = false;
       let attempts = 0;
       
@@ -534,31 +435,23 @@ export default function App() {
             sizeFactor,
             angle,
           };
-          if (elementCategory === 'shape') {
-            const dk = cutoutConfig.defaultShapeKind;
-            if (dk === 'symbol') {
-              newCutouts.push({
-                ...base,
-                shapeKind: 'symbol',
-                char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
-              });
-            } else if (dk === 'randomLetters') {
-              newCutouts.push({
-                ...base,
-                shapeKind: 'randomLetters',
-                char: randomUpperLetter(),
-              });
-            } else {
-              newCutouts.push({
-                ...base,
-                shapeKind: dk,
-              });
-            }
+          const dk = dkForGen;
+          if (dk === 'symbol') {
+            newCutouts.push({
+              ...base,
+              shapeKind: 'symbol',
+              char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
+            });
+          } else if (dk === 'randomLetters') {
+            newCutouts.push({
+              ...base,
+              shapeKind: 'randomLetters',
+              char: randomUpperLetter(),
+            });
           } else {
             newCutouts.push({
               ...base,
-              char:
-                cutoutConfig.defaultChar[Math.floor(Math.random() * cutoutConfig.defaultChar.length)] || 'A',
+              shapeKind: dk,
             });
           }
           placed = true;
@@ -568,7 +461,8 @@ export default function App() {
     }
     setCutouts(newCutouts);
     setSelectedId(null);
-  }, [cutoutConfig, image, elementCategory]);
+  },
+  [cutoutConfig, image]);
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -657,47 +551,35 @@ export default function App() {
     
     // If manual mode, add shape
     if (cutoutConfig.creationMode === 'manual') {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       const newCutout: Cutout =
-        elementCategory === 'shape'
-          ? cutoutConfig.defaultShapeKind === 'symbol'
+        cutoutConfig.defaultShapeKind === 'symbol'
+          ? {
+              id: Math.random().toString(36).substr(2, 9),
+              x: nx,
+              y: ny,
+              sizeFactor: Math.random() - 0.5,
+              angle: Math.random() * Math.PI * 2,
+              shapeKind: 'symbol',
+              char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
+            }
+          : cutoutConfig.defaultShapeKind === 'randomLetters'
             ? {
                 id: Math.random().toString(36).substr(2, 9),
                 x: nx,
                 y: ny,
                 sizeFactor: Math.random() - 0.5,
                 angle: Math.random() * Math.PI * 2,
-                shapeKind: 'symbol',
-                char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
+                shapeKind: 'randomLetters',
+                char: randomUpperLetter(),
               }
-            : cutoutConfig.defaultShapeKind === 'randomLetters'
-              ? {
-                  id: Math.random().toString(36).substr(2, 9),
-                  x: nx,
-                  y: ny,
-                  sizeFactor: Math.random() - 0.5,
-                  angle: Math.random() * Math.PI * 2,
-                  shapeKind: 'randomLetters',
-                  char: randomUpperLetter(),
-                }
-              : {
-                  id: Math.random().toString(36).substr(2, 9),
-                  x: nx,
-                  y: ny,
-                  sizeFactor: Math.random() - 0.5,
-                  angle: Math.random() * Math.PI * 2,
-                  shapeKind: cutoutConfig.defaultShapeKind,
-                }
-          : {
-              id: Math.random().toString(36).substr(2, 9),
-              x: nx,
-              y: ny,
-              sizeFactor: Math.random() - 0.5,
-              angle: Math.random() * Math.PI * 2,
-              char:
-                cutoutConfig.defaultChar[Math.floor(Math.random() * cutoutConfig.defaultChar.length)] ||
-                chars[Math.floor(Math.random() * chars.length)],
-            };
+            : {
+                id: Math.random().toString(36).substr(2, 9),
+                x: nx,
+                y: ny,
+                sizeFactor: Math.random() - 0.5,
+                angle: Math.random() * Math.PI * 2,
+                shapeKind: cutoutConfig.defaultShapeKind,
+              };
       setCutouts((prev) => [...prev, newCutout]);
       setSelectedId(newCutout.id);
       // If the panel was already open, keep it open. If it was closed, keep it closed.
@@ -766,48 +648,35 @@ export default function App() {
     setSelectedId(null);
 
     if (cutoutConfig.creationMode === 'manual') {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       const newCutout: Cutout =
-        elementCategory === 'shape'
-          ? cutoutConfig.defaultShapeKind === 'symbol'
+        cutoutConfig.defaultShapeKind === 'symbol'
+          ? {
+              id: Math.random().toString(36).substr(2, 9),
+              x: nx,
+              y: ny,
+              sizeFactor: Math.random() - 0.5,
+              angle: Math.random() * Math.PI * 2,
+              shapeKind: 'symbol',
+              char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
+            }
+          : cutoutConfig.defaultShapeKind === 'randomLetters'
             ? {
                 id: Math.random().toString(36).substr(2, 9),
                 x: nx,
                 y: ny,
                 sizeFactor: Math.random() - 0.5,
                 angle: Math.random() * Math.PI * 2,
-                shapeKind: 'symbol',
-                char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
+                shapeKind: 'randomLetters',
+                char: randomUpperLetter(),
               }
-            : cutoutConfig.defaultShapeKind === 'randomLetters'
-              ? {
-                  id: Math.random().toString(36).substr(2, 9),
-                  x: nx,
-                  y: ny,
-                  sizeFactor: Math.random() - 0.5,
-                  angle: Math.random() * Math.PI * 2,
-                  shapeKind: 'randomLetters',
-                  char: randomUpperLetter(),
-                }
-              : {
-                  id: Math.random().toString(36).substr(2, 9),
-                  x: nx,
-                  y: ny,
-                  sizeFactor: Math.random() - 0.5,
-                  angle: Math.random() * Math.PI * 2,
-                  shapeKind: cutoutConfig.defaultShapeKind,
-                }
-          : {
-              id: Math.random().toString(36).substr(2, 9),
-              x: nx,
-              y: ny,
-              sizeFactor: Math.random() - 0.5,
-              angle: Math.random() * Math.PI * 2,
-              char:
-                cutoutConfig.defaultChar[
-                  Math.floor(Math.random() * cutoutConfig.defaultChar.length)
-                ] || chars[Math.floor(Math.random() * chars.length)],
-            };
+            : {
+                id: Math.random().toString(36).substr(2, 9),
+                x: nx,
+                y: ny,
+                sizeFactor: Math.random() - 0.5,
+                angle: Math.random() * Math.PI * 2,
+                shapeKind: cutoutConfig.defaultShapeKind,
+              };
       setCutouts((prev) => [...prev, newCutout]);
       setSelectedId(newCutout.id);
       if (wasPanelOpen) {
@@ -836,6 +705,62 @@ export default function App() {
 
   const handleCanvasMouseUp = () => {
     setIsDraggingImage(false);
+    setIsDraggingOverlay(false);
+    setIsResizingOverlay(false);
+  };
+
+  // ---- Overlay Text: drag (move) ----
+  const handleOverlayMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!blockCanvasRef.current || !image || !overlayTextConfig.content.trim()) return;
+    e.stopPropagation();
+    const rect = blockCanvasRef.current.getBoundingClientRect();
+    const scaleX = image.width / rect.width;
+    const scaleY = image.height / rect.height;
+    const cx = overlayTextConfig.x * image.width;
+    const cy = overlayTextConfig.y * image.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+    const dist = Math.hypot(mx - cx, my - cy);
+    const approxW = overlayTextConfig.fontSize * scaleX * 3;
+    if (dist < Math.max(approxW, 30)) {
+      setIsDraggingOverlay(true);
+      overlayDragStartRef.current = { mouseX: mx, mouseY: my, ox: overlayTextConfig.x, oy: overlayTextConfig.y };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+  };
+
+  const handleOverlayMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDraggingOverlay || !blockCanvasRef.current || !image) return;
+    e.stopPropagation();
+    const rect = blockCanvasRef.current.getBoundingClientRect();
+    const scaleX = image.width / rect.width;
+    const scaleY = image.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+    const dx = mx - overlayDragStartRef.current.mouseX;
+    const dy = my - overlayDragStartRef.current.mouseY;
+    setOverlayTextConfig((prev) => ({
+      ...prev,
+      x: Math.max(0.05, Math.min(0.95, overlayDragStartRef.current.ox + dx / image.width)),
+      y: Math.max(0.05, Math.min(0.95, overlayDragStartRef.current.oy + dy / image.height)),
+    }));
+  };
+
+  // ---- Overlay Text: resize (drag vertically) ----
+  const handleOverlayResizeMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!overlayTextConfig.content.trim()) return;
+    e.stopPropagation();
+    setIsResizingOverlay(true);
+    overlayResizeStartRef.current = { mouseY: e.clientY, fontSize: overlayTextConfig.fontSize };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleOverlayResizeMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isResizingOverlay) return;
+    e.stopPropagation();
+    const dy = overlayResizeStartRef.current.mouseY - e.clientY;
+    const newSize = Math.max(24, Math.min(160, overlayResizeStartRef.current.fontSize + dy * 0.4));
+    setOverlayTextConfig((prev) => ({ ...prev, fontSize: Math.round(newSize) }));
   };
 
   const beginCutoutResize = (e: React.PointerEvent) => {
@@ -922,9 +847,7 @@ export default function App() {
 
     const overlayTrim = overlayTextConfig.content.trim();
     const hasOverlayText = overlayTrim.length > 0;
-    const showScatter =
-      hasOverlayText && overlayTextConfig.scattered && stringLetters.length > 0;
-    const showLine = hasOverlayText && !overlayTextConfig.scattered;
+    const showLine = hasOverlayText;
     const oxFontFamily = overlayTextConfig.fontFamily;
     const oxFill = overlayTextConfig.fillColor;
     const scaleRef = canvasWidth / 800;
@@ -945,7 +868,9 @@ export default function App() {
         imgWidth,
         imgHeight,
         basePx,
-        oxFontFamily
+        oxFontFamily,
+        overlayTextConfig.x,
+        overlayTextConfig.y
       );
     }
 
@@ -980,53 +905,7 @@ export default function App() {
       mainCtx.restore();
     });
 
-    if (showLine && lineLayout) {
-      mainCtx.save();
-      mainCtx.font = `800 ${lineLayout.fontSize}px ${oxFontFamily}, sans-serif`;
-      mainCtx.textAlign = 'center';
-      mainCtx.textBaseline = 'middle';
-      lineLayout.lines.forEach((line, i) => {
-        if (!line) return;
-        const y = lineLayout.startY + i * lineLayout.lh;
-        mainCtx.shadowColor = 'rgba(0,0,0,0.22)';
-        mainCtx.shadowBlur = 6 * scaleRef;
-        mainCtx.shadowOffsetX = 1;
-        mainCtx.shadowOffsetY = 2;
-        mainCtx.lineWidth = Math.max(1, lineLayout.fontSize * 0.07);
-        mainCtx.strokeStyle = oxStroke;
-        mainCtx.lineJoin = 'round';
-        mainCtx.strokeText(line, lineLayout.cx, y);
-        mainCtx.shadowColor = 'transparent';
-        mainCtx.fillStyle = oxFill;
-        mainCtx.fillText(line, lineLayout.cx, y);
-      });
-      mainCtx.restore();
-    }
-
-    if (showScatter) {
-      stringLetters.forEach((sl) => {
-        const currentSize =
-          (overlayTextConfig.fontSize + sl.sizeFactor * scatterVariation * 10) * scaleRef;
-        mainCtx.save();
-        mainCtx.translate(sl.x * imgWidth, sl.y * imgHeight);
-        mainCtx.rotate(sl.angle);
-        mainCtx.font = `800 ${currentSize}px ${oxFontFamily}, sans-serif`;
-        mainCtx.textAlign = 'center';
-        mainCtx.textBaseline = 'middle';
-        mainCtx.shadowColor = 'rgba(0,0,0,0.22)';
-        mainCtx.shadowBlur = 5 * scaleRef;
-        mainCtx.shadowOffsetX = 1;
-        mainCtx.shadowOffsetY = 2;
-        mainCtx.lineWidth = Math.max(1, currentSize * 0.06);
-        mainCtx.strokeStyle = oxStroke;
-        mainCtx.lineJoin = 'round';
-        mainCtx.strokeText(sl.char, 0, 0);
-        mainCtx.shadowColor = 'transparent';
-        mainCtx.fillStyle = oxFill;
-        mainCtx.fillText(sl.char, 0, 0);
-        mainCtx.restore();
-      });
-    }
+    // 叠字仅在色块侧绘制，主图不再重复叠字
 
     mainCtx.restore();
 
@@ -1146,56 +1025,6 @@ export default function App() {
         });
       }
     }
-
-    if (showScatter) {
-      stringLetters.forEach((sl) => {
-        const currentSize =
-          (overlayTextConfig.fontSize + sl.sizeFactor * scatterVariation * 10) * scaleRef;
-        const dx = sl.x * imgWidth;
-        const dy = sl.y * imgHeight;
-        blockCtx.save();
-        blockCtx.translate(dx, dy);
-        blockCtx.rotate(sl.angle);
-
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = currentSize * 2;
-        tempCanvas.height = currentSize * 2;
-        const tctx = tempCanvas.getContext('2d');
-        if (tctx) {
-          tctx.save();
-          tctx.translate(currentSize, currentSize);
-          tctx.font = `800 ${currentSize}px ${oxFontFamily}, sans-serif`;
-          tctx.textAlign = 'center';
-          tctx.textBaseline = 'middle';
-          tctx.fillStyle = oxFill || '#fff';
-          tctx.fillText(sl.char, 0, 0);
-          tctx.restore();
-          tctx.globalCompositeOperation = 'source-in';
-          tctx.drawImage(
-            image,
-            sl.x * image.width - (currentSize * image.width / imgWidth) / 2,
-            sl.y * image.height - (currentSize * image.height / imgHeight) / 2,
-            currentSize * image.width / imgWidth,
-            currentSize * image.height / imgHeight,
-            0,
-            0,
-            currentSize * 2,
-            currentSize * 2
-          );
-          blockCtx.drawImage(tempCanvas, -currentSize, -currentSize);
-        }
-
-        blockCtx.font = `800 ${currentSize}px ${oxFontFamily}, sans-serif`;
-        blockCtx.textAlign = 'center';
-        blockCtx.textBaseline = 'middle';
-        blockCtx.lineWidth = Math.max(1, currentSize * 0.055);
-        blockCtx.lineJoin = 'round';
-        blockCtx.strokeStyle = oxStroke;
-        blockCtx.strokeText(sl.char, 0, 0);
-
-        blockCtx.restore();
-      });
-    }
   }, [
     image,
     cutouts,
@@ -1206,7 +1035,6 @@ export default function App() {
     selectedId,
     imagePos,
     overlayTextConfig,
-    stringLetters,
   ]);
 
   const handleSave = async () => {
@@ -1361,109 +1189,6 @@ export default function App() {
       </motion.div>
     ) : null;
 
-  const elementCustomCharPool = (
-    <div className="space-y-4">
-      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">文字内容</label>
-      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-        {['A', 'B', 'C', 'H', 'S', 'O', 'X', '★', '♥', '●'].map((char) => (
-          <button
-            key={char}
-            type="button"
-            onClick={() => {
-              setCutoutConfig((prev) => ({ ...prev, defaultChar: char }));
-              if (selectedId) {
-                setCutouts((prev) =>
-                  prev.map((c) => (c.id === selectedId ? { ...c, char, shapeKind: undefined } : c))
-                );
-              }
-            }}
-            className={`flex-shrink-0 w-12 h-12 rounded-xl text-lg font-black border transition-all flex items-center justify-center ${
-              (selectedId ? cutouts.find((c) => c.id === selectedId)?.char : cutoutConfig.defaultChar) === char
-                ? 'bg-black border-black text-white'
-                : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'
-            }`}
-          >
-            {char}
-          </button>
-        ))}
-      </div>
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">随机 26 位字母串</label>
-        <div className="flex items-stretch gap-2 rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-          <code className="flex-1 min-w-0 px-3 py-2.5 text-[10px] sm:text-[11px] font-mono font-bold text-gray-800 tracking-wide break-all select-all leading-snug self-center">
-            {randomLetterPool26}
-          </code>
-          <div className="flex flex-col shrink-0 border-l border-gray-100">
-            <button
-              type="button"
-              title="重新生成"
-              onClick={() => setRandomLetterPool26(randomAlphaString26())}
-              className="flex-1 px-2.5 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-black transition-colors"
-            >
-              <RefreshCw size={15} />
-            </button>
-            <button
-              type="button"
-              title="填入下方输入框作为字符池"
-              onClick={() => {
-                const pool = randomLetterPool26;
-                setCutoutConfig((prev) => ({ ...prev, defaultChar: pool }));
-                if (selectedId && pool.length > 0) {
-                  setCutouts((prev) =>
-                    prev.map((c) =>
-                      c.id === selectedId ? { ...c, char: pool[0], shapeKind: undefined } : c
-                    )
-                  );
-                }
-              }}
-              className="flex-1 px-2.5 text-[9px] font-black uppercase tracking-tighter text-gray-600 hover:bg-black hover:text-white transition-colors border-t border-gray-100"
-            >
-              填入
-            </button>
-          </div>
-        </div>
-        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest px-1">
-          每位独立随机 A–Z；填入后与「多个字符随机选取」规则一致
-        </p>
-      </div>
-      <div className="space-y-3">
-        <div className="relative">
-          <input
-            type="text"
-            value={cutoutConfig.defaultChar}
-            onChange={(e) => {
-              const val = e.target.value;
-              setCutoutConfig((prev) => ({ ...prev, defaultChar: val }));
-              if (selectedId && val.length > 0) {
-                setCutouts((prev) =>
-                  prev.map((c) =>
-                    c.id === selectedId ? { ...c, char: val[0], shapeKind: undefined } : c
-                  )
-                );
-              }
-            }}
-            className="w-full h-14 px-5 rounded-2xl border border-gray-100 text-lg font-black focus:border-black outline-none transition-all bg-white shadow-sm"
-            placeholder="在此输入文字..."
-          />
-          {cutoutConfig.defaultChar.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setCutoutConfig((prev) => ({ ...prev, defaultChar: '' }))}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-900 transition-colors"
-            >
-              <X size={18} />
-            </button>
-          )}
-        </div>
-        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest px-1">
-          {cutoutConfig.defaultChar.length > 1
-            ? '系统将从您输入的文字中随机选取字符'
-            : '输入单个或多个字符'}
-        </p>
-      </div>
-    </div>
-  );
-
   const elementOverlayTextPanel = (
     <div className="space-y-5">
       <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">画布叠字</label>
@@ -1479,48 +1204,9 @@ export default function App() {
           placeholder="写一句话…可换行"
         />
         <p className="text-[9px] text-gray-400 font-bold leading-snug">
-          有内容后主图叠字；主图字色 + 细描边，色块为照片填字。「拆散」会去掉空格并随机铺字。
+          有内容后仅在色块一侧显示叠字：照片纹理填字 + 字色与细描边。在色块画面上点击文字区域可拖动，拖动手柄调大小。
         </p>
       </div>
-
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">排版方式</label>
-        <div className="flex p-1 bg-gray-100 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setOverlayTextConfig((prev) => ({ ...prev, scattered: false }))}
-            className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all ${
-              !overlayTextConfig.scattered
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-400'
-            }`}
-          >
-            整句
-          </button>
-          <button
-            type="button"
-            onClick={() => setOverlayTextConfig((prev) => ({ ...prev, scattered: true }))}
-            className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all ${
-              overlayTextConfig.scattered
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-400'
-            }`}
-          >
-            拆散
-          </button>
-        </div>
-      </div>
-
-      {overlayTextConfig.scattered && (
-        <button
-          type="button"
-          onClick={() => regenerateStringLetters()}
-          className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-800 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest active:scale-[0.99] transition-all hover:bg-gray-200"
-        >
-          <RefreshCw size={16} />
-          重新打散位置
-        </button>
-      )}
 
       <div className="space-y-2">
         <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">字体</label>
@@ -1566,7 +1252,7 @@ export default function App() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">主图上的字色</label>
+        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">叠字字色（描边之上）</label>
         <div
           className="relative h-11 rounded-2xl overflow-hidden border border-gray-100 shadow-sm"
           style={{ backgroundColor: overlayTextConfig.fillColor }}
@@ -1616,6 +1302,31 @@ export default function App() {
             onChange={(e) => setCutoutConfig((prev) => ({ ...prev, variation: Number(e.target.value) }))}
             className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
           />
+        </div>
+
+        <div className={`space-y-3 ${cutoutConfig.creationMode === 'manual' ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className="flex justify-between items-end">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">形状数量</label>
+            <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.autoCount}</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="80"
+            step="1"
+            value={cutoutConfig.autoCount}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setCutoutConfig((prev) => ({ ...prev, autoCount: next }));
+              if (cutoutConfig.creationMode === 'auto' && image) {
+                generateAutoCutouts({ autoCount: next });
+              }
+            }}
+            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+          />
+          {cutoutConfig.creationMode === 'manual' && (
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">自动模式下可调</p>
+          )}
         </div>
       </div>
 
@@ -1890,21 +1601,17 @@ export default function App() {
             >
               {elementSelectedEditor}
 
-              <div className="grid grid-cols-3 gap-1 p-1.5 bg-gray-100 rounded-2xl mb-4">
+              <div className="grid grid-cols-2 gap-1 p-1.5 bg-gray-100 rounded-2xl mb-4">
                 {(
                   [
-                    { tab: 'shape' as const, label: '形状', cat: 'shape' as const },
-                    { tab: 'cutoutText' as const, label: '文字', cat: 'custom' as const },
-                    { tab: 'overlay' as const, label: '叠字', cat: null },
+                    { tab: 'shape' as const, label: '形状' },
+                    { tab: 'overlay' as const, label: '叠字' },
                   ] as const
-                ).map(({ tab, label, cat }) => (
+                ).map(({ tab, label }) => (
                   <button
                     key={tab}
                     type="button"
-                    onClick={() => {
-                      setElementsPanelTab(tab);
-                      if (cat) setElementCategory(cat);
-                    }}
+                    onClick={() => setElementsPanelTab(tab)}
                     className={`py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-[12px] font-black transition-all ${
                       elementsPanelTab === tab
                         ? 'bg-white text-gray-900 shadow-md'
@@ -1951,6 +1658,9 @@ export default function App() {
                                 )
                               );
                             }
+                            if (cutoutConfig.creationMode === 'auto') {
+                              generateAutoCutouts({ defaultShapeKind: 'symbol' });
+                            }
                           } else if (value === 'randomLetters') {
                             setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'randomLetters' }));
                             if (selectedId) {
@@ -1962,6 +1672,9 @@ export default function App() {
                                 )
                               );
                             }
+                            if (cutoutConfig.creationMode === 'auto') {
+                              generateAutoCutouts({ defaultShapeKind: 'randomLetters' });
+                            }
                           } else {
                             setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: value }));
                             if (selectedId) {
@@ -1970,6 +1683,9 @@ export default function App() {
                                   c.id === selectedId ? { ...c, shapeKind: value, char: undefined } : c
                                 )
                               );
+                            }
+                            if (cutoutConfig.creationMode === 'auto') {
+                              generateAutoCutouts({ defaultShapeKind: value });
                             }
                           }
                         }}
@@ -1984,6 +1700,11 @@ export default function App() {
                     );
                     })}
                   </div>
+                  {cutoutConfig.defaultShapeKind === 'randomLetters' && (
+                    <p className="text-[9px] text-gray-400 font-bold leading-snug px-1">
+                      自动生成：点选本类型后会立刻重新随机位置与 A–Z 字母。手动点击模式：在图片或色块上点击可逐个添加随机字母。
+                    </p>
+                  )}
                   {cutoutConfig.defaultShapeKind === 'symbol' && (
                     <div className="space-y-2 pt-1">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
@@ -2015,8 +1736,6 @@ export default function App() {
                     </div>
                   )}
                 </div>
-              ) : elementsPanelTab === 'cutoutText' ? (
-                elementCustomCharPool
               ) : (
                 elementOverlayTextPanel
               )}
@@ -2101,13 +1820,13 @@ export default function App() {
               }}
             >
               <div className="relative leading-[0]">
-                <canvas 
-                  ref={mainCanvasRef} 
+                <canvas
+                  ref={mainCanvasRef}
                   onMouseDown={handleCanvasMouseDown}
                   onMouseMove={handleCanvasMouseMove}
                   onMouseUp={handleCanvasMouseUp}
                   onMouseLeave={handleCanvasMouseUp}
-                  className={`block p-0 m-0 border-none ${isDraggingImage ? 'cursor-grabbing' : 'cursor-grab'}`} 
+                  className={`block p-0 m-0 border-none ${isDraggingImage ? 'cursor-grabbing' : 'cursor-grab'}`}
                   style={{ width: image.width * zoom, height: image.height * zoom }}
                 />
                 {selectedId && (() => {
@@ -2198,14 +1917,82 @@ export default function App() {
                     </div>
                   );
                 })()}
+
               </div>
               <div className="relative leading-[0]">
                 <canvas
                   ref={blockCanvasRef}
                   onMouseDown={handleBlockCanvasMouseDown}
-                  className="block p-0 m-0 border-none cursor-crosshair"
+                  onMouseMove={(e) => {
+                    handleOverlayMouseMove(e);
+                  }}
+                  onMouseUp={() => {
+                    if (isDraggingOverlay) setIsDraggingOverlay(false);
+                    if (isResizingOverlay) setIsResizingOverlay(false);
+                  }}
+                  onMouseLeave={() => {
+                    if (isDraggingOverlay) setIsDraggingOverlay(false);
+                    if (isResizingOverlay) setIsResizingOverlay(false);
+                  }}
+                  onPointerMove={(e) => {
+                    handleOverlayMouseMove(e as unknown as React.MouseEvent<HTMLCanvasElement>);
+                    if (isDraggingOverlay) e.preventDefault();
+                  }}
+                  onPointerUp={() => {
+                    if (isDraggingOverlay) setIsDraggingOverlay(false);
+                    if (isResizingOverlay) setIsResizingOverlay(false);
+                  }}
+                  className={`block p-0 m-0 border-none ${
+                    isDraggingOverlay || isResizingOverlay ? 'cursor-grabbing' : 'cursor-crosshair'
+                  }`}
                   style={{ width: image.width * zoom, height: image.height * zoom }}
                 />
+                {overlayTextConfig.content.trim().length > 0 && !selectedId && (
+                  <div className="absolute inset-0 pointer-events-none z-10 overflow-visible">
+                    <div
+                      className="absolute pointer-events-auto"
+                      onMouseDown={handleOverlayMouseDown}
+                      onMouseMove={handleOverlayMouseMove}
+                      onMouseUp={() => {
+                        if (isDraggingOverlay) setIsDraggingOverlay(false);
+                      }}
+                      onMouseLeave={() => {
+                        if (isDraggingOverlay) setIsDraggingOverlay(false);
+                      }}
+                      style={{
+                        left: `${overlayTextConfig.x * 100}%`,
+                        top: `${overlayTextConfig.y * 100}%`,
+                        width: '100%',
+                        height: '100%',
+                        transform: 'translate(-50%, -50%)',
+                        cursor: isDraggingOverlay ? 'grabbing' : 'grab',
+                      }}
+                    />
+                    <div
+                      className="absolute border-2 border-dashed border-blue-400 pointer-events-none z-[6]"
+                      style={{
+                        left: `${overlayTextConfig.x * 100}%`,
+                        top: `${overlayTextConfig.y * 100}%`,
+                        minWidth: 80 * zoom,
+                        minHeight: 24 * zoom,
+                        transform: 'translate(-50%, -50%)',
+                        boxShadow: '0 0 8px rgba(59,130,246,0.25)',
+                      }}
+                    />
+                    <div
+                      role="presentation"
+                      className="absolute w-4 h-4 bg-white border-2 border-blue-500 rounded-full shadow-md pointer-events-auto cursor-ns-resize z-20"
+                      style={{
+                        left: `${overlayTextConfig.x * 100}%`,
+                        top: `calc(${overlayTextConfig.y * 100}% + ${overlayTextConfig.fontSize * zoom * 1.5})`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                      onMouseDown={handleOverlayResizeMouseDown}
+                      onMouseMove={handleOverlayResizeMouseMove}
+                      onMouseUp={() => setIsResizingOverlay(false)}
+                    />
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
