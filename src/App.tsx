@@ -29,12 +29,10 @@ import {
   AlignEndVertical,
   AlignEndHorizontal,
   SlidersHorizontal,
-  PaintBucket,
   Images,
   Image as ImageIcon,
   Sparkles,
   Sun,
-  Clock,
   Triangle,
   Type,
 } from 'lucide-react';
@@ -2220,73 +2218,39 @@ export default function App() {
                         </span>
                       </div>
 
-                      {/* 形状填色 */}
+                      {/* 元素打散：开=打散无对称，关=默认对称 */}
                       <div className="flex w-[5rem] min-w-[5rem] shrink-0 flex-col items-center gap-2">
                         <button
                           type="button"
-                          title="形状填色"
-                          aria-label="形状填色"
-                          onClick={() => setExpandedSlider(expandedSlider === 'shapeColor' ? null : 'shapeColor')}
+                          title={cutoutConfig.distributionMode === 'scatter' ? '元素打散（已开启）' : '元素打散（关闭为对称）'}
+                          aria-label="元素打散"
+                          onClick={() =>
+                            setCutoutConfig((prev) => ({
+                              ...prev,
+                              distributionMode: prev.distributionMode === 'sync' ? 'scatter' : 'sync',
+                            }))
+                          }
                           className={`h-[4.25rem] w-[4.25rem] shrink-0 flex flex-col items-center justify-center gap-1 rounded-full transition-all ${
-                            expandedSlider === 'shapeColor'
+                            cutoutConfig.distributionMode === 'scatter'
                               ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
                               : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
                           }`}
                         >
-                          <PaintBucket size={17} strokeWidth={expandedSlider === 'shapeColor' ? 2.2 : 1.65} aria-hidden />
-                          <span
-                            className={`h-3 w-3 rounded-full border-2 ${
-                              expandedSlider === 'shapeColor' ? 'border-white' : 'border-gray-300'
-                            }`}
-                            style={{ backgroundColor: cutoutConfig.shapeColor }}
-                          />
-                        </button>
-                        <span
-                          className={`min-h-[2.25rem] w-full text-center text-[8px] font-black leading-snug tracking-tight sm:text-[9px] ${
-                            expandedSlider === 'shapeColor' ? 'text-emerald-800' : 'text-gray-700'
-                          }`}
-                        >
-                          形状填色
-                        </span>
-                      </div>
-
-                      {/* 元素对称 */}
-                      <div className="flex w-[5rem] min-w-[5rem] shrink-0 flex-col items-center gap-2">
-                        <button
-                          type="button"
-                          title="元素对称"
-                          aria-label="元素对称"
-                          onClick={() => setExpandedSlider(expandedSlider === 'distributionMode' ? null : 'distributionMode')}
-                          className={`h-[4.25rem] w-[4.25rem] shrink-0 flex flex-col items-center justify-center gap-1 rounded-full transition-all ${
-                            expandedSlider === 'distributionMode'
-                              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/25'
-                              : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'
-                          }`}
-                        >
-                          <span className="relative inline-flex h-[17px] w-[17px] items-center justify-center text-current" aria-hidden>
-                            <Clock size={17} strokeWidth={expandedSlider === 'distributionMode' ? 2.2 : 1.65} />
-                            <span
-                              className={`pointer-events-none absolute bottom-[-3px] right-[-2px] text-[5px] font-black leading-none tracking-tighter ${
-                                expandedSlider === 'distributionMode' ? 'text-white' : 'text-gray-500'
-                              }`}
-                            >
-                              HD
-                            </span>
-                          </span>
+                          <Sparkles size={17} strokeWidth={cutoutConfig.distributionMode === 'scatter' ? 2.2 : 1.65} aria-hidden />
                           <span
                             className={`text-[10px] font-mono font-bold leading-none ${
-                              expandedSlider === 'distributionMode' ? 'text-white' : 'text-gray-400'
+                              cutoutConfig.distributionMode === 'scatter' ? 'text-white' : 'text-gray-400'
                             }`}
                           >
-                            {cutoutConfig.distributionMode === 'sync' ? '是' : '否'}
+                            {cutoutConfig.distributionMode === 'scatter' ? '开' : '关'}
                           </span>
                         </button>
                         <span
                           className={`min-h-[2.25rem] w-full text-center text-[8px] font-black leading-snug tracking-tight sm:text-[9px] ${
-                            expandedSlider === 'distributionMode' ? 'text-emerald-800' : 'text-gray-700'
+                            cutoutConfig.distributionMode === 'scatter' ? 'text-emerald-800' : 'text-gray-700'
                           }`}
                         >
-                          元素对称
+                          元素打散
                         </span>
                       </div>
 
@@ -2363,34 +2327,6 @@ export default function App() {
                           onChange={(e) => setCutoutConfig((prev) => ({ ...prev, variation: Number(e.target.value) }))}
                           className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
                         />
-                      )}
-                      {expandedSlider === 'shapeColor' && (
-                        <div className="relative h-9 rounded-xl overflow-hidden border border-gray-100" style={{ backgroundColor: cutoutConfig.shapeColor }}>
-                          <input
-                            type="color"
-                            value={cutoutConfig.shapeColor}
-                            onChange={(e) => setCutoutConfig((prev) => ({ ...prev, shapeColor: e.target.value }))}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                          />
-                        </div>
-                      )}
-                      {expandedSlider === 'distributionMode' && (
-                        <div className="flex gap-2">
-                          {(['sync', 'scatter'] as DistributionMode[]).map((mode) => (
-                            <button
-                              key={mode}
-                              type="button"
-                              onClick={() => setCutoutConfig((prev) => ({ ...prev, distributionMode: mode }))}
-                              className={`flex-1 py-2.5 rounded-2xl text-[10px] font-black transition-all ${
-                                cutoutConfig.distributionMode === mode
-                                  ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-400 shadow-sm'
-                                  : 'bg-gray-50/80 text-gray-600 border border-gray-200 hover:bg-gray-100/80'
-                              }`}
-                            >
-                              {mode === 'sync' ? '对称（是）' : '打散（否）'}
-                            </button>
-                          ))}
-                        </div>
                       )}
                     </div>
                   </div>
