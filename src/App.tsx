@@ -1806,132 +1806,206 @@ export default function App() {
               </div>
 
               {elementsPanelTab === 'shape' ? (
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">形状类型</label>
-                  <div className="flex flex-wrap gap-2">
-                    {SHAPE_OPTIONS.map(({ value, icon: ShapeIcon, title }) => {
-                      const selectedCutout = selectedId
-                        ? cutouts.find((c) => c.id === selectedId)
-                        : undefined;
-                      let activeShapeKind: ShapeKind | null = cutoutConfig.defaultShapeKind;
-                      if (selectedCutout) {
-                        activeShapeKind = selectedCutout.shapeKind ?? null;
-                      }
-                      const active = activeShapeKind !== null && activeShapeKind === value;
-                      return (
-                      <button
-                        key={value}
-                        type="button"
-                        title={title}
-                        aria-label={title}
-                        onClick={() => {
-                          if (value === 'symbol') {
-                            setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'symbol' }));
-                            if (selectedId) {
-                              setCutouts((prev) =>
-                                prev.map((c) =>
-                                  c.id === selectedId
-                                    ? {
-                                        ...c,
-                                        shapeKind: 'symbol',
-                                        char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
-                                      }
-                                    : c
-                                )
-                              );
-                            }
-                            if (cutoutConfig.creationMode === 'auto') {
-                              generateAutoCutouts({ defaultShapeKind: 'symbol' });
-                            }
-                          } else if (value === 'randomLetters') {
-                            setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'randomLetters' }));
-                            if (selectedId) {
-                              setCutouts((prev) =>
-                                prev.map((c) =>
-                                  c.id === selectedId
-                                    ? { ...c, shapeKind: 'randomLetters', char: randomUpperLetter() }
-                                    : c
-                                )
-                              );
-                            }
-                            if (cutoutConfig.creationMode === 'auto') {
-                              generateAutoCutouts({ defaultShapeKind: 'randomLetters' });
-                            }
-                          } else {
-                            setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: value }));
-                            if (selectedId) {
-                              setCutouts((prev) =>
-                                prev.map((c) =>
-                                  c.id === selectedId ? { ...c, shapeKind: value, char: undefined } : c
-                                )
-                              );
-                            }
-                            if (cutoutConfig.creationMode === 'auto') {
-                              generateAutoCutouts({ defaultShapeKind: value });
-                            }
-                          }
-                        }}
-                        className={`w-11 h-11 shrink-0 flex items-center justify-center rounded-full transition-all border ${
-                          active
-                            ? 'bg-black border-black text-white shadow-md'
-                            : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                        }`}
-                      >
-                        <ShapeIcon size={20} strokeWidth={active ? 2.5 : 2} aria-hidden />
-                      </button>
-                    );
-                    })}
-                  </div>
-                  {cutoutConfig.defaultShapeKind === 'randomLetters' && (
-                    <p className="text-[9px] text-gray-400 font-bold leading-snug px-1">
-                      自动生成：点选本类型后会立刻重新随机位置与 A–Z 字母。手动点击模式：在图片或色块上点击可逐个添加随机字母。
-                    </p>
-                  )}
-                  {cutoutConfig.defaultShapeKind === 'symbol' && (
-                    <div className="space-y-2 pt-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                        符号内容
-                      </label>
-                      <input
-                        type="text"
-                        value={cutoutConfig.customShapeSymbol}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setCutoutConfig((prev) => ({ ...prev, customShapeSymbol: val }));
-                          const g = [...val].filter(Boolean);
-                          if (selectedId) {
-                            setCutouts((prev) =>
-                              prev.map((c) =>
-                                c.id === selectedId && c.shapeKind === 'symbol'
-                                  ? { ...c, char: g.length ? g[0] : '★' }
-                                  : c
-                              )
-                            );
-                          }
-                        }}
-                        className="w-full h-12 px-4 rounded-2xl border border-gray-100 text-lg font-black text-center focus:border-black outline-none bg-white shadow-sm"
-                        placeholder="输入符号，如 ★ ♥ @ …"
-                      />
-                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest px-1">
-                        多个字符时，重新生成会从中随机选取；选中项会同步为第一个字符
-                      </p>
+                <div className="space-y-5">
+                  {elementSelectedEditor}
+
+                  {/* 形状类型（横排网格） */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">形状</label>
+                    <div className="flex flex-wrap gap-2">
+                      {SHAPE_OPTIONS.map(({ value, icon: ShapeIcon, title }) => {
+                        const selectedCutout = selectedId ? cutouts.find((c) => c.id === selectedId) : undefined;
+                        let activeShapeKind: ShapeKind | null = cutoutConfig.defaultShapeKind;
+                        if (selectedCutout) activeShapeKind = selectedCutout.shapeKind ?? null;
+                        const active = activeShapeKind !== null && activeShapeKind === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            title={title}
+                            aria-label={title}
+                            onClick={() => {
+                              if (value === 'symbol') {
+                                setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'symbol' }));
+                                if (selectedId) setCutouts((prev) => prev.map((c) => c.id === selectedId ? { ...c, shapeKind: 'symbol', char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol) } : c));
+                                if (cutoutConfig.creationMode === 'auto') generateAutoCutouts({ defaultShapeKind: 'symbol' });
+                              } else if (value === 'randomLetters') {
+                                setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'randomLetters' }));
+                                if (selectedId) setCutouts((prev) => prev.map((c) => c.id === selectedId ? { ...c, shapeKind: 'randomLetters', char: randomUpperLetter() } : c));
+                                if (cutoutConfig.creationMode === 'auto') generateAutoCutouts({ defaultShapeKind: 'randomLetters' });
+                              } else {
+                                setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: value }));
+                                if (selectedId) setCutouts((prev) => prev.map((c) => c.id === selectedId ? { ...c, shapeKind: value, char: undefined } : c));
+                                if (cutoutConfig.creationMode === 'auto') generateAutoCutouts({ defaultShapeKind: value });
+                              }
+                            }}
+                            className={`w-11 h-11 shrink-0 flex items-center justify-center rounded-full transition-all border ${
+                              active ? 'bg-black border-black text-white shadow-md' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            <ShapeIcon size={20} strokeWidth={active ? 2.5 : 2} aria-hidden />
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
+                    {cutoutConfig.defaultShapeKind === 'randomLetters' && (
+                      <p className="text-[9px] text-gray-400 font-bold leading-snug px-1">自动生成：点选后立刻随机位置与 A–Z 字母。手动点击：可逐个添加随机字母。</p>
+                    )}
+                    {cutoutConfig.defaultShapeKind === 'symbol' && (
+                      <div className="space-y-2 pt-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">符号内容</label>
+                        <input
+                          type="text"
+                          value={cutoutConfig.customShapeSymbol}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCutoutConfig((prev) => ({ ...prev, customShapeSymbol: val }));
+                            const g = [...val].filter(Boolean);
+                            if (selectedId) setCutouts((prev) => prev.map((c) => c.id === selectedId && c.shapeKind === 'symbol' ? { ...c, char: g.length ? g[0] : '★' } : c));
+                          }}
+                          className="w-full h-12 px-4 rounded-2xl border border-gray-100 text-lg font-black text-center focus:border-black outline-none bg-white shadow-sm"
+                          placeholder="输入符号，如 ★ ♥ @ …"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 散落数量滑块 */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-end">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">散落</label>
+                      <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.scatterCount}</span>
+                    </div>
+                    <input
+                      type="range" min="1" max="12" step="1"
+                      value={cutoutConfig.scatterCount}
+                      onChange={(e) => setCutoutConfig((prev) => ({ ...prev, scatterCount: Number(e.target.value) }))}
+                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+                    />
+                  </div>
+
+                  {/* 基础大小 */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-end">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">大小</label>
+                      <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.baseSize}</span>
+                    </div>
+                    <input
+                      type="range" min="4" max="200"
+                      value={cutoutConfig.baseSize}
+                      onChange={(e) => setCutoutConfig((prev) => ({ ...prev, baseSize: Number(e.target.value) }))}
+                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+                    />
+                  </div>
+
+                  {/* 随机差异 */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-end">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">随机</label>
+                      <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.variation}</span>
+                    </div>
+                    <input
+                      type="range" min="0" max="10" step="0.5"
+                      value={cutoutConfig.variation}
+                      onChange={(e) => setCutoutConfig((prev) => ({ ...prev, variation: Number(e.target.value) }))}
+                      className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+                    />
+                  </div>
+
+                  {/* 数量 + 形状颜色 */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className={`space-y-2 ${cutoutConfig.creationMode === 'manual' ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <div className="flex justify-between items-end">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">数量</label>
+                        <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.autoCount}</span>
+                      </div>
+                      <input
+                        type="range" min="1" max="80" step="1"
+                        value={cutoutConfig.autoCount}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          setCutoutConfig((prev) => ({ ...prev, autoCount: next }));
+                          if (cutoutConfig.creationMode === 'auto' && image) generateAutoCutouts({ autoCount: next });
+                        }}
+                        className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-black"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">色块填色</label>
+                      <div className="relative h-10 rounded-xl overflow-hidden border border-gray-100 shadow-sm" style={{ backgroundColor: cutoutConfig.shapeColor }}>
+                        <input
+                          type="color" value={cutoutConfig.shapeColor}
+                          onChange={(e) => setCutoutConfig((prev) => ({ ...prev, shapeColor: e.target.value }))}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 分布模式 */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">分布</label>
+                    <div className="flex gap-2">
+                      {(['sync', 'scatter'] as DistributionMode[]).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setCutoutConfig((prev) => ({ ...prev, distributionMode: mode }))}
+                          className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
+                            cutoutConfig.distributionMode === mode
+                              ? 'bg-black border-black text-white shadow-md'
+                              : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          {mode === 'sync' ? '对称' : '打散'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 生成方式 */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">生成</label>
+                    <div className="flex gap-2">
+                      {(['auto', 'manual'] as CreationMode[]).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            setCutoutConfig((prev) => ({ ...prev, creationMode: mode }));
+                            if (mode === 'auto' && cutouts.length === 0) generateAutoCutouts();
+                          }}
+                          className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
+                            cutoutConfig.creationMode === mode
+                              ? 'bg-black border-black text-white shadow-md'
+                              : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          {mode === 'auto' ? '自动' : '手动'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 操作按钮 */}
+                  <div className="flex gap-3">
+                    <button type="button" onClick={generateAutoCutouts}
+                      className="flex-1 flex items-center justify-center gap-2 bg-black text-white py-4 rounded-2xl transition-all text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-95">
+                      <RefreshCw size={16} /><span>重新生成</span>
+                    </button>
+                    <button type="button" onClick={() => { setCutouts([]); setSelectedId(null); }}
+                      className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-600 py-4 rounded-2xl transition-all text-[11px] font-black uppercase tracking-widest active:scale-95">
+                      <Trash2 size={16} /><span>清空</span>
+                    </button>
+                  </div>
+
+                  <button type="button" onClick={() => setActiveTab(null)}
+                    className="w-full py-3 bg-gray-50 text-gray-400 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-gray-100 hover:text-gray-600 transition-all flex items-center justify-center gap-2">
+                    <ChevronDown size={16} /><span>收起面板</span>
+                  </button>
                 </div>
               ) : (
                 elementOverlayTextPanel
-              )}
-
-              {elementsPanelTab !== 'overlay' && elementSharedFooter}
-              {elementsPanelTab === 'overlay' && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab(null)}
-                  className="w-full py-4 bg-gray-50 text-gray-400 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-gray-100 hover:text-gray-600 transition-all flex items-center justify-center gap-2"
-                >
-                  <ChevronDown size={16} />
-                  <span>收起设置面板</span>
-                </button>
               )}
             </motion.div>
           )}
