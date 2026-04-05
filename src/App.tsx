@@ -136,6 +136,24 @@ function randomUpperLetter(): string {
   return letters[Math.floor(Math.random() * letters.length)];
 }
 
+/** 画面为空时用于保证至少出现一个可见图案（画布中心） */
+function createCenterCutout(kind: ShapeKind, symbolPool: string): Cutout {
+  const base = {
+    id: Math.random().toString(36).substr(2, 9),
+    x: 0.5,
+    y: 0.5,
+    sizeFactor: 0,
+    angle: Math.random() * Math.PI * 2,
+  };
+  if (kind === 'symbol') {
+    return { ...base, shapeKind: 'symbol', char: pickRandomSymbolChar(symbolPool) };
+  }
+  if (kind === 'randomLetters') {
+    return { ...base, shapeKind: 'randomLetters', char: randomUpperLetter() };
+  }
+  return { ...base, shapeKind: kind };
+}
+
 function cutoutGlyphChar(c: Cutout, customSymbolPool: string): string {
   if (c.shapeKind === 'randomLetters') return c.char || randomUpperLetter();
   return c.char || pickRandomSymbolChar(customSymbolPool);
@@ -551,6 +569,9 @@ export default function App() {
         }
         attempts++;
       }
+    }
+    if (newCutouts.length === 0 && count >= 1) {
+      newCutouts.push(createCenterCutout(dkForGen, cutoutConfig.customShapeSymbol));
     }
     setCutouts(newCutouts);
     setSelectedId(null);
@@ -1975,32 +1996,39 @@ export default function App() {
                                   }
                                   return;
                                 }
+                                const pool = cutoutConfig.customShapeSymbol;
                                 if (value === 'symbol') {
                                   setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'symbol' }));
                                   setCutouts((prev) =>
-                                    prev.map((c) => ({
-                                      ...c,
-                                      shapeKind: 'symbol' as ShapeKind,
-                                      char: pickRandomSymbolChar(cutoutConfig.customShapeSymbol),
-                                    }))
+                                    image && prev.length === 0
+                                      ? [createCenterCutout('symbol', pool)]
+                                      : prev.map((c) => ({
+                                          ...c,
+                                          shapeKind: 'symbol' as ShapeKind,
+                                          char: pickRandomSymbolChar(pool),
+                                        }))
                                   );
                                 } else if (value === 'randomLetters') {
                                   setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: 'randomLetters' }));
                                   setCutouts((prev) =>
-                                    prev.map((c) => ({
-                                      ...c,
-                                      shapeKind: 'randomLetters' as ShapeKind,
-                                      char: randomUpperLetter(),
-                                    }))
+                                    image && prev.length === 0
+                                      ? [createCenterCutout('randomLetters', pool)]
+                                      : prev.map((c) => ({
+                                          ...c,
+                                          shapeKind: 'randomLetters' as ShapeKind,
+                                          char: randomUpperLetter(),
+                                        }))
                                   );
                                 } else {
                                   setCutoutConfig((prev) => ({ ...prev, defaultShapeKind: value }));
                                   setCutouts((prev) =>
-                                    prev.map((c) => ({
-                                      ...c,
-                                      shapeKind: value as ShapeKind,
-                                      char: undefined,
-                                    }))
+                                    image && prev.length === 0
+                                      ? [createCenterCutout(value, pool)]
+                                      : prev.map((c) => ({
+                                          ...c,
+                                          shapeKind: value as ShapeKind,
+                                          char: undefined,
+                                        }))
                                   );
                                 }
                               }}
