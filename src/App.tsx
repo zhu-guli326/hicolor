@@ -37,6 +37,7 @@ import {
   Type,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- Types & Constants ---
 
@@ -2626,6 +2627,7 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #ddd; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
       `}} />
+    <Analytics />
     </div>
   );
 }
