@@ -1098,7 +1098,7 @@ export default function App() {
   const [composition, setComposition] = useState<CompositionMode>('block-bottom');
   const [zoom, setZoom] = useState(0.6);
   /** 色块在「主图+色块」整条里所占比例，20%–100%（100% 内部按 99% 计算避免除零） */
-  /** 默认 100%：主图区与色块区各一整格原图尺寸（总预览为原图 2 倍宽或 2 倍高） */
+  /** 主图预览始终一整格原图缩放；色块区为条带「裁剪」宽度/高度（占比仅改变条带，不挤压主图格） */
   const [blockAreaPercent, setBlockAreaPercent] = useState(100);
   const blockStripRatio = Math.min(0.99, Math.max(0.2, blockAreaPercent / 100));
 
@@ -1163,17 +1163,18 @@ export default function App() {
     const availableWidth = window.innerWidth - padding;
     const availableHeight = window.innerHeight - headerHeight - navHeight - settingsPanelHeight - padding;
     
-    // 预览为「主图 + 色块」2 倍宽或 2 倍高，按此估算缩放
+    // 与 measurePreviewContain 一致：总尺寸 = 1 格主图 + r 格条带（非固定 2 格）
     const isVert = composition === 'block-bottom' || composition === 'block-top';
-    const totalWidth = isVert ? image.width : image.width * 2;
-    const totalHeight = isVert ? image.height * 2 : image.height;
+    const stripR = Math.min(0.99, Math.max(0.2, blockAreaPercent / 100));
+    const totalWidth = isVert ? image.width : image.width * (1 + stripR);
+    const totalHeight = isVert ? image.height * (1 + stripR) : image.height;
 
     const scaleX = availableWidth / totalWidth;
     const scaleY = availableHeight / totalHeight;
 
     const newZoom = Math.min(scaleX, scaleY, 1);
     setZoom(newZoom);
-  }, [image, composition, settingsPanelOpen]);
+  }, [image, composition, settingsPanelOpen, blockAreaPercent]);
 
   useEffect(() => {
     fitToScreen();
@@ -1209,42 +1210,43 @@ export default function App() {
     const iw = img.naturalWidth;
     const ih = img.naturalHeight;
     const isVertical = composition === 'block-bottom' || composition === 'block-top';
-    // 整块预览：竖排 宽×(2高)，横排 (2宽)×高
+    /** 条带占「一整格原图」边长的比例；主图区始终 1×1 格，仅条带宽窄变化 */
+    const rPrev = Math.min(1, Math.max(0.2, blockAreaPercent / 100));
     const scale = isVertical
-      ? Math.min(av / iw, ah / (ih * 2))
-      : Math.min(av / (iw * 2), ah / ih);
+      ? Math.min(av / iw, ah / (ih * (1 + rPrev)))
+      : Math.min(av / (iw * (1 + rPrev)), ah / ih);
     const cw = iw * scale;
     const ch = ih * scale;
-    /** 预览内色块区占「一整格原图」的比例（导出仍用 blockStripRatio） */
-    const rPrev = Math.min(1, Math.max(0.2, blockAreaPercent / 100));
     let mainW: number;
     let mainH: number;
     let blockW: number;
     let blockH: number;
     if (isVertical) {
-      blockH = ch * rPrev;
-      mainH = ch * 2 - blockH;
       mainW = cw;
+      mainH = ch;
       blockW = cw;
+      blockH = ch * rPrev;
+      const totalH = ch + blockH;
       setContain({
         w: cw,
-        h: ch * 2,
+        h: totalH,
         ox: (av - cw) / 2,
-        oy: (ah - ch * 2) / 2,
+        oy: (ah - totalH) / 2,
         mainW,
         mainH,
         blockW,
         blockH,
       });
     } else {
-      blockW = cw * rPrev;
-      mainW = cw * 2 - blockW;
+      mainW = cw;
       mainH = ch;
+      blockW = cw * rPrev;
       blockH = ch;
+      const totalW = cw + blockW;
       setContain({
-        w: cw * 2,
+        w: totalW,
         h: ch,
-        ox: (av - cw * 2) / 2,
+        ox: (av - totalW) / 2,
         oy: (ah - ch) / 2,
         mainW,
         mainH,
@@ -2533,7 +2535,7 @@ export default function App() {
                     className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
                   />
                   <p className="text-[8px] font-bold text-gray-400 leading-snug">
-                    调整色块在整版中的高度或宽度占比（20%–100%），与自动适配一起生效，导出一致
+                    仅改变条带区宽窄（相对一整格原图），主图预览尺寸不变；20%–100%，导出与预览一致
                   </p>
                 </div>
               </div>
