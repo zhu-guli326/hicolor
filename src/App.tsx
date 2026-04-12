@@ -44,8 +44,8 @@ import type { LucideIcon } from 'lucide-react';
 type BottomNavTab = 'background' | 'elements';
 
 type CompositionMode = 'block-bottom' | 'block-top' | 'block-left' | 'block-right';
-/** 纯色 | 双拼色(条纹) | 渐变 | 图片 */
-type BackgroundType = 'solid' | 'split' | 'gradient' | 'image';
+/** 纯色 | 双拼色(条纹) | 渐变 | 图片 | 格子 | 笔记本 | 棋盘格 | 点阵 */
+type BackgroundType = 'solid' | 'split' | 'gradient' | 'image' | 'grid' | 'diagonal' | 'block' | 'dots';
 type CreationMode = 'auto' | 'manual';
 type DistributionMode = 'sync' | 'scatter';
 /** 元素面板内：形状挖空 / 画布叠字 */
@@ -623,6 +623,37 @@ function sampleBlockPatternColor(
     const band = Math.floor(y / s) % 2;
     return band === 0 ? bg.color2 : bg.color1;
   }
+  // 笔记本：条纹
+  if (bg.type === 'grid') {
+    const s = Math.max(2, bg.stripeSize);
+    const lineWidth = Math.max(1, Math.floor(s * 0.08) + 1);
+    const band = Math.floor(y / s) % 2;
+    const yInBand = y % s;
+    return (yInBand < lineWidth) ? bg.color2 : bg.color1;
+  }
+  // 格子：纯格子边框线
+  if (bg.type === 'diagonal') {
+    const s = Math.max(4, bg.stripeSize);
+    const onBorder = (x % s < 0.5) || (y % s < 0.5);
+    return onBorder ? bg.color2 : bg.color1;
+  }
+  // 棋盘格：标准棋盘格
+  if (bg.type === 'block') {
+    const s = Math.max(2, bg.stripeSize);
+    const xBand = Math.floor(x / s) % 2;
+    const yBand = Math.floor(y / s) % 2;
+    return (xBand + yBand) % 2 === 0 ? bg.color2 : bg.color1;
+  }
+  // 点阵：圆点阵列
+  if (bg.type === 'dots') {
+    const s = Math.max(4, bg.stripeSize);
+    const cx = (Math.floor(x / s) + 0.5) * s;
+    const cy = (Math.floor(y / s) + 0.5) * s;
+    const r = s * 0.35;
+    const dx = x - cx;
+    const dy = y - cy;
+    return (dx * dx + dy * dy < r * r) ? bg.color2 : bg.color1;
+  }
   return bg.color1;
 }
 
@@ -704,6 +735,69 @@ function paintBlockFillOnContext(
         ctx.fillRect(0, y, w, Math.min(s, h - y));
         ctx.fillStyle = bgConfig.color2;
         ctx.fillRect(0, y + s, w, Math.min(s, h - y - s));
+      }
+    }
+  } else if (bgConfig.type === 'grid') {
+    // 笔记本风格：条纹
+    const s = Math.max(2, bgConfig.stripeSize);
+    const lineWidth = Math.max(1, Math.floor(s * 0.08) + 1);
+    ctx.fillStyle = bgConfig.color1;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = bgConfig.color2;
+    const isVertical = composition === 'block-left' || composition === 'block-right';
+    if (isVertical) {
+      // 垂直条纹
+      for (let x = 0; x < w; x += s) {
+        ctx.fillRect(x, 0, lineWidth, h);
+      }
+    } else {
+      // 水平条纹
+      for (let y = 0; y < h; y += s) {
+        ctx.fillRect(0, y, w, lineWidth);
+      }
+    }
+  } else if (bgConfig.type === 'diagonal') {
+    // 格子：纯格子边框线
+    const s = Math.max(4, bgConfig.stripeSize);
+    ctx.fillStyle = bgConfig.color1;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = bgConfig.color2;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += s) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+    }
+    for (let y = 0; y <= h; y += s) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+    }
+    ctx.stroke();
+  } else if (bgConfig.type === 'block') {
+    const s = Math.max(4, bgConfig.stripeSize);
+    // 先填满底色 color1
+    ctx.fillStyle = bgConfig.color1;
+    ctx.fillRect(0, 0, w, h);
+    // 棋盘格：交替用 color2 填充
+    ctx.fillStyle = bgConfig.color2;
+    for (let gy = 0; gy < h; gy += s) {
+      for (let gx = 0; gx < w; gx += s) {
+        if (((Math.floor(gx / s) + Math.floor(gy / s)) % 2 === 0)) {
+          ctx.fillRect(gx, gy, s, s);
+        }
+      }
+    }
+  } else if (bgConfig.type === 'dots') {
+    const s = Math.max(4, bgConfig.stripeSize);
+    const r = s * 0.35;
+    ctx.fillStyle = bgConfig.color1;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = bgConfig.color2;
+    for (let dy = 0; dy < h; dy += s) {
+      for (let dx = 0; dx < w; dx += s) {
+        ctx.beginPath();
+        ctx.arc(dx + s / 2, dy + s / 2, r, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
   } else {
@@ -1284,7 +1378,7 @@ export default function App() {
 
   // 3. Shape Configuration
   const [cutoutConfig, setCutoutConfig] = useState({
-    baseSize: 24,
+    baseSize: 50,
     variation: 2,
     autoCount: 24,
     creationMode: 'auto' as CreationMode,
@@ -1296,8 +1390,6 @@ export default function App() {
     shapeColor: '#ffffff',
     /** 每个元素位置散落的形状数量（>=1，1=单个形状） */
     scatterCount: 3,
-    /** 自动排布时禁止落入画面中心的比例（归一化距离，约 0.22≈挡脸区，0 为关闭硬禁区） */
-    centerSafeRadius: 0.22,
   });
 
   const [overlayTextConfig, setOverlayTextConfig] = useState({
@@ -1344,12 +1436,11 @@ export default function App() {
     (opts?: { defaultShapeKind?: ShapeKind; autoCount?: number; imageOverride?: HTMLImageElement }) => {
     const img = opts?.imageOverride ?? image;
     if (!img) return;
-    const { autoCount, baseSize, variation, centerSafeRadius } = cutoutConfig;
+    const { autoCount, baseSize, variation } = cutoutConfig;
     const count = Math.max(1, Math.round(opts?.autoCount ?? autoCount));
     const dkForGen = opts?.defaultShapeKind ?? cutoutConfig.defaultShapeKind;
     const newCutouts: Cutout[] = [];
     const maxAttempts = 100;
-    const safeR = Math.max(0, Math.min(0.42, centerSafeRadius));
     const stripR = Math.min(0.99, Math.max(0.2, blockAreaPercent / 100));
     const { mainW, mainH } = getLayoutDimensions(composition, stripR, img.width, img.height);
 
@@ -1362,24 +1453,9 @@ export default function App() {
       let attempts = 0;
       
       while (!placed && attempts < maxAttempts) {
-        let x = Math.random();
-        let y = Math.random();
+        const x = Math.random();
+        const y = Math.random();
         
-        const distFromCenter = distFromNormCenter(x, y);
-
-        // 硬禁区：保护区内的点一律不要（全程生效，避免后半段采样堆到人脸）
-        if (safeR > 0 && distFromCenter < safeR) {
-          attempts++;
-          continue;
-        }
-
-        // 软偏好：越靠边越容易保留（全程生效）
-        const keepProb = Math.pow(Math.min(distFromCenter, 0.707) / 0.5, 1.65);
-        if (Math.random() > keepProb) {
-          attempts++;
-          continue;
-        }
-
         const sizeFactor = Math.random() - 0.5;
         const currentSize = baseSize + sizeFactor * variation * 10;
         const angle = Math.random() * Math.PI * 2;
@@ -1436,7 +1512,7 @@ export default function App() {
     }
     if (newCutouts.length === 0 && count >= 1) {
       newCutouts.push(
-        createFallbackCutout(dkForGen, cutoutConfig.customShapeSymbol, Math.max(safeR, 0.12))
+        createFallbackCutout(dkForGen, cutoutConfig.customShapeSymbol, 0)
       );
     }
     setCutouts(newCutouts);
@@ -2296,34 +2372,6 @@ export default function App() {
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">自动模式下可调</p>
           )}
         </div>
-
-        <div className="space-y-3">
-          <div className="flex justify-between items-end">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">避开中心</label>
-            <span className="text-[10px] font-mono font-bold text-gray-900">
-              {Math.round(cutoutConfig.centerSafeRadius * 100)}%
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="38"
-            step="1"
-            value={Math.round(cutoutConfig.centerSafeRadius * 100)}
-            onChange={(e) => {
-              const pct = Number(e.target.value);
-              const v = Math.min(0.42, Math.max(0, pct / 100));
-              setCutoutConfig((prev) => ({ ...prev, centerSafeRadius: v }));
-              if (cutoutConfig.creationMode === 'auto' && image) {
-                generateAutoCutouts();
-              }
-            }}
-            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
-          />
-          <p className="text-[9px] text-gray-400 font-bold leading-snug">
-            自动排布时禁止形状落在画面中央一带；调高更靠边，可减少挡住人像主体。设为 0% 则关闭硬禁区（仍略偏好边缘）。
-          </p>
-        </div>
       </div>
 
       <div className="space-y-3 pt-2">
@@ -2540,16 +2588,20 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 底图：四选一 */}
+              {/* 底图：八选一 */}
               <div className="space-y-2 pr-10">
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">底图类型</label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-4 gap-2">
                   {(
                     [
                       { type: 'solid' as const, label: '纯色' },
                       { type: 'split' as const, label: '双拼色' },
                       { type: 'gradient' as const, label: '渐变' },
                       { type: 'image' as const, label: '图片' },
+                      { type: 'grid' as const, label: '笔记本' },
+                      { type: 'diagonal' as const, label: '格子' },
+                      { type: 'block' as const, label: '棋盘格' },
+                      { type: 'dots' as const, label: '点阵' },
                     ] as const
                   ).map(({ type, label }) => {
                     const active = bgConfig.type === type;
@@ -2558,7 +2610,7 @@ export default function App() {
                         key={type}
                         type="button"
                         onClick={() => setBgConfig((prev) => ({ ...prev, type }))}
-                        className={`rounded-xl border py-2.5 text-center text-[11px] font-black shadow-sm transition-all sm:text-xs ${
+                        className={`rounded-xl border py-2.5 text-center text-[11px] font-black shadow-sm transition-all ${
                           active
                             ? 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200/70'
                             : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
@@ -2607,7 +2659,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    {(bgConfig.type === 'gradient' || bgConfig.type === 'split') && (
+                    {(bgConfig.type === 'gradient' || bgConfig.type === 'split' || bgConfig.type === 'grid' || bgConfig.type === 'diagonal' || bgConfig.type === 'block' || bgConfig.type === 'dots') && (
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <span className="text-[8px] font-black text-gray-400">颜色二</span>
                         <div className="group relative">
@@ -2668,6 +2720,24 @@ export default function App() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-end">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">条纹宽度</label>
+                    <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.stripeSize}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="4"
+                    max="128"
+                    step="4"
+                    value={bgConfig.stripeSize}
+                    onChange={(e) => setBgConfig((prev) => ({ ...prev, stripeSize: Number(e.target.value) }))}
+                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
+                  />
+                </div>
+              )}
+
+              {(bgConfig.type === 'grid' || bgConfig.type === 'diagonal' || bgConfig.type === 'block' || bgConfig.type === 'dots') && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-end">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em">图案密度</label>
                     <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.stripeSize}px</span>
                   </div>
                   <input
@@ -2809,7 +2879,7 @@ export default function App() {
                                           createFallbackCutout(
                                             'symbol',
                                             pool,
-                                            Math.max(cutoutConfig.centerSafeRadius, 0.12)
+                                            0
                                           ),
                                         ]
                                       : prev.map((c) => ({
@@ -2826,7 +2896,7 @@ export default function App() {
                                           createFallbackCutout(
                                             'randomLetters',
                                             pool,
-                                            Math.max(cutoutConfig.centerSafeRadius, 0.12)
+                                            0
                                           ),
                                         ]
                                       : prev.map((c) => ({
@@ -2843,7 +2913,7 @@ export default function App() {
                                           createFallbackCutout(
                                             value,
                                             pool,
-                                            Math.max(cutoutConfig.centerSafeRadius, 0.12)
+                                            0
                                           ),
                                         ]
                                       : prev.map((c) => ({
@@ -2950,16 +3020,6 @@ export default function App() {
                           <span className={`text-[7px] font-black leading-snug tracking-tight ${expandedSlider === 'variation' ? 'text-emerald-800' : 'text-gray-700'}`}>随机差异</span>
                         </div>
 
-                        {/* 避开中心 */}
-                        <div className={`flex w-[4rem] min-w-[4rem] shrink-0 flex-col items-center gap-1 ${cutoutConfig.creationMode === 'manual' ? 'opacity-40' : ''}`}>
-                          <button type="button" onClick={() => cutoutConfig.creationMode !== 'manual' && setExpandedSlider(expandedSlider === 'centerSafe' ? null : 'centerSafe')}
-                            className={`h-[3rem] w-[3rem] shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-full transition-all ${expandedSlider === 'centerSafe' && cutoutConfig.creationMode !== 'manual' ? 'bg-emerald-700 text-white' : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'}`}>
-                            <Target size={13} strokeWidth={expandedSlider === 'centerSafe' ? 2.2 : 1.65} />
-                            <span className={`text-[9px] font-mono font-bold tabular-nums leading-none ${expandedSlider === 'centerSafe' && cutoutConfig.creationMode !== 'manual' ? 'text-white' : 'text-gray-400'}`}>{Math.round(cutoutConfig.centerSafeRadius * 100)}%</span>
-                          </button>
-                          <span className={`text-[7px] font-black leading-snug tracking-tight ${expandedSlider === 'centerSafe' && cutoutConfig.creationMode !== 'manual' ? 'text-emerald-800' : 'text-gray-700'}`}>避开中心</span>
-                        </div>
-
                         {/* 元素打散 */}
                         <div className="flex w-[4rem] min-w-[4rem] shrink-0 flex-col items-center gap-1">
                           <button type="button" onClick={() => setCutoutConfig((prev) => ({ ...prev, distributionMode: prev.distributionMode === 'sync' ? 'scatter' : 'sync' }))}
@@ -2996,11 +3056,6 @@ export default function App() {
                         {expandedSlider === 'variation' && cutoutConfig.creationMode !== 'manual' && (
                           <input type="range" min="0" max="10" step="0.5" value={cutoutConfig.variation}
                             onChange={(e) => setCutoutConfig((prev) => ({ ...prev, variation: Number(e.target.value) }))}
-                            className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600" />
-                        )}
-                        {expandedSlider === 'centerSafe' && cutoutConfig.creationMode !== 'manual' && (
-                          <input type="range" min="0" max="38" step="1" value={Math.round(cutoutConfig.centerSafeRadius * 100)}
-                            onChange={(e) => { const pct = Number(e.target.value); const v = Math.min(0.42, Math.max(0, pct / 100)); setCutoutConfig((prev) => ({ ...prev, centerSafeRadius: v })); if (image) generateAutoCutouts(); }}
                             className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600" />
                         )}
                       </div>
