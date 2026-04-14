@@ -6,6 +6,9 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, ChangeEvent } from 'react';
 import heic2any from 'heic2any';
 import { motion, AnimatePresence } from 'motion/react';
+import { toPng } from 'html-to-image';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import {
   Upload,
   RefreshCw,
@@ -36,16 +39,27 @@ import {
   Triangle,
   Type,
   Shuffle,
+  Video,
+  Play,
+  CloudRain,
+  Maximize,
+  ChevronRight,
+  Layers,
+  Loader2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 // --- Types & Constants ---
 
-type BottomNavTab = 'background' | 'elements';
+type BottomNavTab = 'background' | 'elements' | 'video';
+
+type AnimationType = 'pulse' | 'batch' | 'rain' | 'stars' | 'none';
 
 type CompositionMode = 'block-bottom' | 'block-top' | 'block-left' | 'block-right';
 /** 纯色 | 双拼色(条纹) | 渐变 | 图片 | 格子 | 笔记本 | 棋盘格 | 点阵 */
 type BackgroundType = 'solid' | 'split' | 'gradient' | 'image' | 'grid' | 'diagonal' | 'block' | 'dots';
+/** 底图纹理类型：无纹理 | 细腻纸张 | 细腻噪点 | 颗粒纸张 | 粗砂纸 */
+type TextureType = 'none' | 'fine-paper' | 'fine-noise' | 'grain-paper' | 'coarse-paper';
 type CreationMode = 'auto' | 'manual';
 type DistributionMode = 'sync' | 'scatter';
 /** 元素面板内：形状挖空 / 画布叠字 */
@@ -428,7 +442,8 @@ function drawOverlayTextOnContext(
   shapeColor: string,
   photoInText:
     | { mode: 'stretch-full' }
-    | { mode: 'crop'; sx: number; sy: number; sw: number; sh: number }
+    | { mode: 'crop'; sx: number; sy: number; sw: number; sh: number },
+  usePhotoFill: boolean = false
 ) {
   if (!overlayTrim || w <= 0 || h <= 0) return;
   const scaleRef = w / 800;
@@ -451,14 +466,14 @@ function drawOverlayTextOnContext(
     targetCtx.font = `800 ${lineLayout.fontSize}px ${fontFamily}, sans-serif`;
     targetCtx.textAlign = 'center';
     targetCtx.textBaseline = 'middle';
-    targetCtx.lineWidth = Math.max(1, lineLayout.fontSize * 0.065);
-    targetCtx.lineJoin = 'round';
-    targetCtx.strokeStyle = strokeColor;
-    targetCtx.strokeText(line, lineLayout.cx, y);
+    targetCtx.textAlign = 'center';
+    targetCtx.textBaseline = 'middle';
     targetCtx.fillStyle = fillColor;
     targetCtx.fillText(line, lineLayout.cx, y);
     targetCtx.restore();
   });
+
+  if (!usePhotoFill) return;
 
   const tc = document.createElement('canvas');
   tc.width = w;
@@ -683,6 +698,98 @@ function fillCutoutShapeAtOrigin(
   }
 }
 
+/**
+ * 纸张纹理效果生成器
+ * 在已绘制的背景上叠加细微的噪声/颗粒纹理，增强纸张质感
+ */
+function applyPaperTexture(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  textureType: TextureType
+) {
+  if (textureType === 'none') return;
+
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  // 获取平均亮度，用于调整纹理强度
+  let totalBrightness = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+  }
+  const avgBrightness = totalBrightness / (data.length / 4);
+  const brightnessFactor = avgBrightness > 128 ? 1 : 0.7; // 暗色背景纹理要弱一些
+
+  // 根据纹理类型设置参数
+  let noiseDensity: number;
+  let noiseStrength: number;
+  let useColorNoise: boolean;
+
+  switch (textureType) {
+    case 'fine-paper':
+      // 细腻纸张：低密度、低强度
+      noiseDensity = 0.4;
+      noiseStrength = 12 * brightnessFactor;
+      useColorNoise = false;
+      break;
+    case 'fine-noise':
+      // 细腻噪点：中密度、中强度、轻微色彩噪点
+      noiseDensity = 0.6;
+      noiseStrength = 15 * brightnessFactor;
+      useColorNoise = true;
+      break;
+    case 'grain-paper':
+      // 颗粒纸张：高密度、中高强度
+      noiseDensity = 0.8;
+      noiseStrength = 18 * brightnessFactor;
+      useColorNoise = false;
+      break;
+    case 'coarse-paper':
+      // 粗砂纸：最高密度、高强度
+      noiseDensity = 1.0;
+      noiseStrength = 25 * brightnessFactor;
+      useColorNoise = false;
+      break;
+    default:
+      return;
+  }
+
+  // 使用高质量随机数生成器（线性同余生成器）确保纹理稳定性
+  let seed = 12345;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+    return (seed >>> 0) / 0xffffffff;
+  };
+
+  const pixelCount = data.length / 4;
+
+  for (let i = 0; i < pixelCount; i++) {
+    const idx = i * 4;
+
+    // 只对一定比例的像素应用噪声，实现纹理感而非全像素噪声
+    if (random() > noiseDensity) continue;
+
+    // 生成与位置相关的噪声
+    const noiseX = (i % w);
+    const noiseY = Math.floor(i / w);
+    const noiseVal = (Math.sin(noiseX * 12.9898 + noiseY * 78.233) * 43758.5453) % 1;
+    const signedNoise = noiseVal - 0.5;
+
+    // 应用噪声到每个通道
+    for (let c = 0; c < 3; c++) {
+      let noise = signedNoise * noiseStrength;
+      if (useColorNoise) {
+        // 为 RGB 各通道添加略微不同的噪声，产生色彩噪点效果
+        noise *= (0.8 + random() * 0.4);
+      }
+      data[idx + c] = Math.min(255, Math.max(0, data[idx + c] + noise));
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
 /** 与主画布 / 导出色块面一致：整幅 w×h 上铺背景（条纹方向随 composition） */
 function paintBlockFillOnContext(
   ctx: CanvasRenderingContext2D,
@@ -695,6 +802,7 @@ function paintBlockFillOnContext(
     stripeSize: number;
     gradientAngle: number;
     bgImage: HTMLImageElement | null;
+    texture: TextureType;
   },
   composition: CompositionMode
 ) {
@@ -803,6 +911,11 @@ function paintBlockFillOnContext(
   } else {
     ctx.fillStyle = bgConfig.color1;
     ctx.fillRect(0, 0, w, h);
+  }
+
+  // 绘制纹理
+  if (bgConfig.texture !== 'none') {
+    applyPaperTexture(ctx, w, h, bgConfig.texture);
   }
 }
 
@@ -951,6 +1064,169 @@ function drawCutoutsAsHoles(
       ctx.restore();
     }
   });
+  ctx.restore();
+}
+
+/** 形状切换动画：在底图上用形状裁剪，只保留形状内的图像 */
+function drawCutoutsBatchAnimation(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  image: HTMLImageElement,
+  cutouts: Cutout[],
+  cutoutConfig: {
+    baseSize: number;
+    variation: number;
+    customShapeSymbol: string;
+  },
+  batchShapeType: 'circle' | 'square' | 'star' | 'heart' | 'drop' | 'snowflake'
+) {
+  ctx.save();
+  
+  // 先绘制底图
+  ctx.drawImage(image, 0, 0, w, h);
+  
+  // 设置裁剪模式：只保留形状内的内容
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = 'white';
+  
+  cutouts.forEach((c) => {
+    const currentSize =
+      (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (w / 800);
+    const dx = c.x * w;
+    const dy = c.y * h;
+
+    ctx.save();
+    ctx.translate(dx, dy);
+    ctx.rotate(c.angle);
+    ctx.beginPath();
+    addShapePath(ctx, batchShapeType, currentSize);
+    ctx.fill();
+    ctx.restore();
+  });
+  
+  ctx.restore();
+}
+
+/** 基于图像内容分析生成形状位置 */
+function analyzeImageForShapes(img: HTMLImageElement, count: number): { x: number; y: number; brightness: number }[] {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return [];
+  
+  canvas.width = 100;
+  canvas.height = 100;
+  ctx.drawImage(img, 0, 0, 100, 100);
+  
+  const imageData = ctx.getImageData(0, 0, 100, 100);
+  const pixels = imageData.data;
+  
+  // 分析像素亮度，收集高亮区域
+  const brightPoints: { x: number; y: number; brightness: number }[] = [];
+  for (let y = 0; y < 100; y += 5) {
+    for (let x = 0; x < 100; x += 5) {
+      const i = (y * 100 + x) * 4;
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      // 计算亮度
+      const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+      brightPoints.push({ x: x / 100, y: y / 100, brightness });
+    }
+  }
+  
+  // 按亮度排序，取最亮的点作为形状中心
+  brightPoints.sort((a, b) => b.brightness - a.brightness);
+  
+  // 选择形状位置：优先选择亮区
+  const result: { x: number; y: number; brightness: number }[] = [];
+  for (let i = 0; i < Math.min(count, brightPoints.length); i++) {
+    // 添加一些随机性，避免形状太集中
+    const point = brightPoints[i];
+    const jitterX = (Math.random() - 0.5) * 0.1;
+    const jitterY = (Math.random() - 0.5) * 0.1;
+    result.push({
+      x: Math.max(0.1, Math.min(0.9, point.x + jitterX)),
+      y: Math.max(0.1, Math.min(0.9, point.y + jitterY)),
+      brightness: point.brightness
+    });
+  }
+  
+  // 如果需要更多形状，补充随机位置
+  while (result.length < count) {
+    result.push({
+      x: 0.1 + Math.random() * 0.8,
+      y: 0.1 + Math.random() * 0.8,
+      brightness: Math.random()
+    });
+  }
+  
+  return result;
+}
+
+/** 绘制五角星形状 */
+function drawStarShape(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number,
+  points: number = 5
+) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const angle = (i * Math.PI) / points - Math.PI / 2;
+    const radius = i % 2 === 0 ? size : size * 0.4;
+    const x = cx + radius * Math.cos(angle);
+    const y = cy + radius * Math.sin(angle);
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** 形状叠加动画：在底图上用形状裁剪，只显示前 N 个形状内的图像 */
+function drawCutoutsPulseReveal(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  image: HTMLImageElement,
+  visibleCutouts: Cutout[],
+  cutoutConfig: {
+    baseSize: number;
+    variation: number;
+    customShapeSymbol: string;
+  }
+) {
+  ctx.save();
+  
+  // 先绘制底图
+  ctx.drawImage(image, 0, 0, w, h);
+  
+  // 如果有可见形状，用形状裁剪
+  if (visibleCutouts.length > 0) {
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.fillStyle = 'white';
+    
+    visibleCutouts.forEach((c) => {
+      const currentSize =
+        (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (w / 800);
+      const dx = c.x * w;
+      const dy = c.y * h;
+
+      ctx.save();
+      ctx.translate(dx, dy);
+      ctx.rotate(c.angle);
+      ctx.beginPath();
+      addShapePath(ctx, c.shapeKind || 'circle', currentSize);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+  
   ctx.restore();
 }
 
@@ -1172,6 +1448,35 @@ const COMPOSITIONS: { value: CompositionMode; label: string; icon: React.FC<{ si
 
 // --- Main Application ---
 
+// TemplateButton 组件
+function TemplateButton({ label, icon, active, onClick, onDeselect }: { label: string; icon: React.ReactNode; active: boolean; onClick: () => void; onDeselect?: () => void }) {
+  return (
+    <div className="relative">
+      <button
+        onClick={onClick}
+        className={`
+          w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all text-[11px] font-black uppercase tracking-widest
+          ${active
+            ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/25'
+            : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'}
+        `}
+      >
+        <span className={active ? 'text-white' : 'text-gray-400'}>{icon}</span>
+        <span>{label}</span>
+      </button>
+      {active && onDeselect && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDeselect(); }}
+          className="absolute -top-2 -right-2 w-5 h-5 bg-gray-800 text-white rounded-full flex items-center justify-center text-[10px] font-black hover:bg-gray-900 transition-colors shadow-md"
+          title="取消使用模板"
+        >
+          <X size={10} strokeWidth={3} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // --- State ---
   const [activeTab, setActiveTab] = useState<BottomNavTab | null>(null);
@@ -1188,6 +1493,132 @@ export default function App() {
 
   const [expandedSlider, setExpandedSlider] = useState<string | null>(null);
 
+  // 视频模块相关状态
+  const [activeAnimation, setActiveAnimation] = useState<AnimationType>('none');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showStarsIntro, setShowStarsIntro] = useState(false);
+  const [batchShapeType, setBatchShapeType] = useState<'circle' | 'square' | 'star' | 'heart' | 'drop' | 'snowflake'>('circle');
+  const [batchPositionOffset, setBatchPositionOffset] = useState(0);
+  const [pulseRevealCount, setPulseRevealCount] = useState(0);
+  // 慢步雨季效果：雨滴下落百分比 (0-1)
+  const [rainfallOffset, setRainfallOffset] = useState(0);
+  // 雨滴生成状态：0=初始, 1=生成中, 2=下落中, 3=完成一轮
+  const [rainfallPhase, setRainfallPhase] = useState(0);
+  // 璀璨星河效果：星星亮度 (0-1)
+  const [starBrightness, setStarBrightness] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [showExportSuccess, setShowExportSuccess] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
+  const [videoMimeType, setVideoMimeType] = useState('video/mp4');
+  const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const previewWrapRef = useRef<HTMLDivElement>(null);
+
+  // 初始化 FFmpeg
+  useEffect(() => {
+    const loadFFmpeg = async () => {
+      if (ffmpegRef.current) return;
+      const ffmpeg = new FFmpeg();
+      ffmpeg.on('progress', ({ progress }) => {
+        // FFmpeg 转码进度反馈给 UI
+      });
+      try {
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+        ffmpegRef.current = ffmpeg;
+        setFfmpegLoaded(true);
+      } catch (err) {
+        console.error('FFmpeg 加载失败:', err);
+      }
+    };
+    loadFFmpeg();
+  }, []);
+
+  // 形状切换动画：更快频率随机切换形状和角度
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (activeAnimation === 'batch' && isPlaying) {
+      interval = setInterval(() => {
+        setBatchPositionOffset(prev => prev + 1);
+      }, 300);
+    }
+    return () => clearInterval(interval);
+  }, [activeAnimation, isPlaying]);
+
+      // 形状叠加动画：逐个显现图形，每 0.1 秒显现一个
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (activeAnimation === 'pulse' && isPlaying && cutouts.length > 0) {
+      setPulseRevealCount(0);
+      interval = setInterval(() => {
+        setPulseRevealCount(prev => {
+          if (prev >= 50) {
+            // 达到50个后重新开始
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, 250); // 每0.25秒增加1
+    }
+    return () => clearInterval(interval);
+  }, [activeAnimation, isPlaying, cutouts.length]);
+
+  // 慢步雨季动画：雨滴从画面中央缓缓下落
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if ((activeAnimation === 'rainfall' || activeAnimation === 'rain') && isPlaying) {
+      // 阶段0: 初始状态，准备生成雨滴
+      // 阶段1: 雨滴生成中（延迟0.5秒）
+      // 阶段2: 雨滴下落中
+      setRainfallPhase(1);
+      setRainfallOffset(0);
+      
+      interval = setInterval(() => {
+        setRainfallOffset(prev => {
+          if (prev >= 1) {
+            // 一轮完成，重置
+            setRainfallPhase(1);
+            return 0;
+          }
+          return prev + 0.01; // 缓慢下落
+        });
+        
+        // 0.5秒后进入下落阶段
+        setRainfallPhase(2);
+      }, 50); // 50ms * 100 = 5秒完成一轮下落
+    }
+    return () => clearInterval(interval);
+  }, [activeAnimation, isPlaying]);
+
+  // 璀璨星河动画：星星逐渐变亮
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (activeAnimation === 'stars' && isPlaying) {
+      setStarBrightness(0);
+      setShowStarsIntro(true);
+      
+      // 开场动画1.5秒后消失
+      setTimeout(() => setShowStarsIntro(false), 1500);
+      
+      // 星星逐渐变亮
+      interval = setInterval(() => {
+        setStarBrightness(prev => {
+          if (prev >= 1) {
+            // 达到最亮后重置循环
+            return 0;
+          }
+          return Math.min(1, prev + 0.02); // 每50ms增加0.02，约2.5秒达到最亮
+        });
+      }, 50);
+    }
+    return () => clearInterval(interval);
+  }, [activeAnimation, isPlaying]);
+
   // 1. Canvas Configuration
   const [composition, setComposition] = useState<CompositionMode>('block-bottom');
   const [zoom, setZoom] = useState(0.6);
@@ -1200,7 +1631,7 @@ export default function App() {
     setPickingTarget(null);
   }, [activeTab]);
 
-  const settingsPanelOpen = activeTab === 'background' || activeTab === 'elements';
+  const settingsPanelOpen = activeTab === 'background' || activeTab === 'elements' || activeTab === 'video';
 
   const settingsPanelRef = useRef<HTMLDivElement>(null);
   const bottomNavRef = useRef<HTMLElement>(null);
@@ -1218,7 +1649,6 @@ export default function App() {
   });
   /** 主内容区（有稳定宽高），用于测量；勿用预览自身 0×0 盒子做唯一尺寸来源 */
   const previewStageRef = useRef<HTMLDivElement>(null);
-  const previewWrapRef = useRef<HTMLDivElement>(null);
 
   /** 点击面板、底栏、顶栏以外的区域时收起设置面板（含取色、展开滑块） */
   useEffect(() => {
@@ -1374,11 +1804,12 @@ export default function App() {
     stripeSize: 48,
     gradientAngle: 90, // 渐变角度（度）
     bgImage: null as HTMLImageElement | null,
+    texture: 'none' as TextureType, // 底图纹理
   });
 
   // 3. Shape Configuration
   const [cutoutConfig, setCutoutConfig] = useState({
-    baseSize: 50,
+    baseSize: 35,
     variation: 2,
     autoCount: 24,
     creationMode: 'auto' as CreationMode,
@@ -1395,12 +1826,14 @@ export default function App() {
   const [overlayTextConfig, setOverlayTextConfig] = useState({
     content: '',
     fontSize: 52,
-    fontFamily: '"Noto Sans SC", sans-serif',
+    fontFamily: '"Bungee Inline", cursive',
     fillColor: '#ffffff',
-    strokeColor: '#000000',
+    strokeColor: '#ffffff',
     /** 叠字在画面中的相对位置 (0–1)，默认居中 */
     x: 0.5,
     y: 0.5,
+    /** 是否使用图片填充文字（默认不使用） */
+    usePhotoFill: false,
   });
 
   const overlayTextConfigRef = useRef(overlayTextConfig);
@@ -1448,26 +1881,71 @@ export default function App() {
     const refW = 800;
     const refH = (mainH / mainW) * refW;
 
+    // 根据动画模板类型分析图像内容，生成形状位置
+    const imageAnalysis = analyzeImageForShapes(img, count);
+
     for (let i = 0; i < count; i++) {
       let placed = false;
       let attempts = 0;
       
       while (!placed && attempts < maxAttempts) {
-        const x = Math.random();
-        const y = Math.random();
+        // 基于图像分析选择位置
+        const analysisPoint = imageAnalysis[i] || { x: Math.random(), y: Math.random() };
+        const x = attempts < 10 ? analysisPoint.x + (Math.random() - 0.5) * 0.15 : Math.random();
+        const y = attempts < 10 ? analysisPoint.y + (Math.random() - 0.5) * 0.15 : Math.random();
         
         const sizeFactor = Math.random() - 0.5;
         const currentSize = baseSize + sizeFactor * variation * 10;
         const angle = Math.random() * Math.PI * 2;
-        
-        // Check collision with existing shapes
+
+        // 计算形状旋转后的轴对齐包围盒（AABB），用于精确碰撞检测
+        const getRotatedAABB = (cx: number, cy: number, size: number, rot: number) => {
+          // 四个角的相对坐标（以中心为原点）
+          const halfSize = size / 2;
+          const corners = [
+            { x: -halfSize, y: -halfSize },
+            { x: halfSize, y: -halfSize },
+            { x: halfSize, y: halfSize },
+            { x: -halfSize, y: halfSize },
+          ];
+          // 旋转并平移到实际坐标
+          const cos = Math.cos(rot);
+          const sin = Math.sin(rot);
+          const rotated = corners.map(c => ({
+            x: cx + c.x * cos - c.y * sin,
+            y: cy + c.x * sin + c.y * cos,
+          }));
+          // 计算 AABB
+          const xs = rotated.map(p => p.x);
+          const ys = rotated.map(p => p.y);
+          return {
+            minX: Math.min(...xs),
+            maxX: Math.max(...xs),
+            minY: Math.min(...ys),
+            maxY: Math.max(...ys),
+          };
+        };
+
+        // 检查碰撞（使用旋转后的 AABB）
         const collision = newCutouts.some(other => {
           const otherSize = baseSize + other.sizeFactor * variation * 10;
-          const dx = (x - other.x) * refW;
-          const dy = (y - other.y) * refH;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          const minDistance = (currentSize + otherSize) / 2 + 20; // 20px padding
-          return distance < minDistance;
+          // 转换为实际像素坐标
+          const cx1 = x * refW;
+          const cy1 = y * refH;
+          const cx2 = other.x * refW;
+          const cy2 = other.y * refH;
+
+          const box1 = getRotatedAABB(cx1, cy1, currentSize, angle);
+          const box2 = getRotatedAABB(cx2, cy2, otherSize, other.angle);
+
+          // 添加 5px 的安全边距
+          const margin = 5;
+          return !(
+            box1.maxX + margin < box2.minX ||
+            box2.maxX + margin < box1.minX ||
+            box1.maxY + margin < box2.minY ||
+            box2.maxY + margin < box1.minY
+          );
         });
 
         if (!collision) {
@@ -1519,6 +1997,291 @@ export default function App() {
     setSelectedId(null);
   },
   [cutoutConfig, image, composition, blockAreaPercent]);
+
+  // 星河动画的星星
+  const introStars = useRef(Array.from({ length: 20 }).map((_, i) => ({
+    id: `intro-star-${i}`,
+    x: 5 + Math.random() * 90,
+    y: 5 + Math.random() * 90,
+    size: 10 + Math.random() * 20,
+    delay: i * 0.15,
+  }))).current;
+
+  // 雨滴数据
+  const RAINDROPS = useRef(Array.from({ length: 20 }).map((_, i) => ({
+    id: `rain-${i}`,
+    x: Math.random() * 100,
+    delay: i * 0.4,
+    duration: 5 + Math.random() * 3,
+  }))).current;
+
+  // 根据色块配置计算雨滴颜色
+  const getRainDropColor = (xPercent: number, yPercent: number): string => {
+    const { type, color1, color2, stripeSize } = bgConfig;
+    const s = stripeSize || 32;
+
+    // 判断条纹方向：左右布局是竖直条纹，上下布局是水平条纹
+    const isVerticalStripes = composition === 'block-left' || composition === 'block-right';
+
+    if (type === 'solid') {
+      return color1;
+    } else if (type === 'gradient') {
+      return yPercent < 0.5 ? color1 : color2;
+    } else if (type === 'split') {
+      // 双拼条纹：根据条纹方向判断
+      const stripeWidth = s * 2;
+      if (isVerticalStripes) {
+        // 竖直条纹：根据 x 判断
+        const isFirstColor = Math.floor(xPercent * 100 / stripeWidth) % 2 === 0;
+        return isFirstColor ? color1 : color2;
+      } else {
+        // 水平条纹：根据 y 判断
+        const isFirstColor = Math.floor(yPercent * 100 / stripeWidth) % 2 === 0;
+        return isFirstColor ? color1 : color2;
+      }
+    } else if (type === 'grid' || type === 'diagonal') {
+      return color2;
+    } else if (type === 'block') {
+      // 棋盘格
+      const gx = Math.floor(xPercent * 100 / s);
+      const gy = Math.floor(yPercent * 100 / s);
+      return ((gx + gy) % 2 === 0) ? color1 : color2;
+    } else if (type === 'dots') {
+      return color2;
+    }
+    return color1;
+  };
+
+  // 五角星 SVG 组件（与元素面板形状一致）
+  const StarSVG = ({ size, className }: { size: number; className?: string }) => {
+    const spikes = 5;
+    const outerR = size / 2;
+    const innerR = outerR * 0.38;
+    const points: string[] = [];
+    
+    for (let i = 0; i < spikes * 2; i++) {
+      const rad = (i * Math.PI) / spikes - Math.PI / 2;
+      const rr = i % 2 === 0 ? outerR : innerR;
+      const x = outerR + Math.cos(rad) * rr;
+      const y = outerR + Math.sin(rad) * rr;
+      points.push(`${x},${y}`);
+    }
+    
+    return (
+      <svg 
+        width={size} 
+        height={size} 
+        viewBox={`0 0 ${size} ${size}`}
+        className={className}
+      >
+        <polygon points={points.join(' ')} fill="currentColor" />
+      </svg>
+    );
+  };
+
+  // 水滴 SVG 组件（与元素面板形状一致）
+  const DropSVG = ({ size, style, className }: { size: number; style?: React.CSSProperties; className?: string }) => {
+    const r = size / 2;
+    const cx = size / 2;
+    const cy = size / 2;
+    const path = `
+      M ${cx} ${cy - r}
+      C ${cx + r * 0.78} ${cy - r * 0.38}, ${cx + r * 0.92} ${cy + r}, ${cx} ${cy + r}
+      C ${cx - r * 0.92} ${cy + r}, ${cx - r * 0.78} ${cy - r * 0.38}, ${cx} ${cy - r}
+      Z
+    `;
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        style={style}
+        className={className}
+      >
+        <path d={path} fill="currentColor" />
+      </svg>
+    );
+  };
+
+  const handleAnimationSelect = (type: AnimationType) => {
+    setActiveAnimation(type);
+    setIsPlaying(true);
+    
+    if (type === 'stars') {
+      setShowStarsIntro(true);
+      setTimeout(() => setShowStarsIntro(false), 4000);
+    }
+    
+    // 根据动画模板调整形状生成
+    if (image && cutouts.length > 0) {
+      // 根据动画类型调整形状
+      const shapeKinds: Exclude<ShapeKind, 'symbol' | 'randomLetters'>[] = ['circle', 'square', 'star', 'drop', 'snowflake', 'heart'];
+      
+      // 璀璨星河：优先使用星形/雪花
+      // 漫步雨季：优先使用水滴
+      // 其他动画：保持原有设置或使用随机
+      let preferredShapes: Exclude<ShapeKind, 'symbol' | 'randomLetters'>[] = shapeKinds;
+      if (type === 'stars') {
+        preferredShapes = ['star', 'snowflake'];
+      } else if (type === 'rain') {
+        preferredShapes = ['drop', 'circle'];
+      } else if (type === 'pulse') {
+        preferredShapes = ['circle', 'heart'];
+      } else if (type === 'batch') {
+        preferredShapes = shapeKinds;
+      }
+      
+      // 重新生成形状（基于图像分析）
+      const img = image;
+      const { mainW, mainH } = getLayoutDimensions(composition, Math.min(0.99, Math.max(0.2, blockAreaPercent / 100)), img.width, img.height);
+      const refW = 800;
+      const refH = (mainH / mainW) * refW;
+      const imageAnalysis = analyzeImageForShapes(img, cutouts.length);
+      
+      setCutouts(prev => prev.map((c, i) => {
+        const analysisPoint = imageAnalysis[i] || { x: Math.random(), y: Math.random() };
+        return {
+          ...c,
+          x: analysisPoint.x,
+          y: analysisPoint.y,
+          shapeKind: preferredShapes[Math.floor(Math.random() * preferredShapes.length)],
+          sizeFactor: c.sizeFactor,
+          angle: c.angle,
+        };
+      }));
+    }
+  };
+
+  const handleExport = async () => {
+    if (!image) {
+      setExportError('请先上传一张背景图片');
+      return;
+    }
+    if (activeAnimation === 'none') {
+      setExportError('请先选择一个动画模板');
+      return;
+    }
+    if (!previewWrapRef.current) {
+      setExportError('预览区域未加载，请稍后重试');
+      return;
+    }
+    
+    // 如果动画还没开始播放，先开始播放
+    if (!isPlaying) {
+      setIsPlaying(true);
+    }
+    
+    setExportError(null);
+    setIsExporting(true);
+    setExportProgress(0);
+    setVideoBlobUrl(null);
+
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('无法创建绘图上下文');
+
+      const rect = previewWrapRef.current.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp9',
+        videoBitsPerSecond: 5000000,
+      });
+
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      recorder.onstop = async () => {
+        const webmBlob = new Blob(chunks, { type: 'video/webm' });
+
+        // 确保 FFmpeg 已加载
+        if (!ffmpegRef.current) {
+          const ffmpeg = new FFmpeg();
+          const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+          await ffmpeg.load({
+            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          });
+          ffmpegRef.current = ffmpeg;
+          setFfmpegLoaded(true);
+        }
+
+        const ffmpeg = ffmpegRef.current;
+        await ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+        await ffmpeg.exec([
+          '-i', 'input.webm',
+          '-c:v', 'libx264',
+          '-preset', 'fast',
+          '-crf', '23',
+          '-c:a', 'aac',
+          '-b:a', '128k',
+          'output.mp4'
+        ]);
+        const data = await ffmpeg.readFile('output.mp4');
+        const mp4Blob = new Blob([data], { type: 'video/mp4' });
+        const url = URL.createObjectURL(mp4Blob);
+        setVideoBlobUrl(url);
+        setVideoMimeType('video/mp4');
+        setIsExporting(false);
+        setShowExportSuccess(true);
+      };
+
+      recorder.start();
+
+      const duration = 3000;
+      const startTime = Date.now();
+      
+      const captureFrame = async () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(100, Math.round((elapsed / duration) * 100));
+        setExportProgress(progress);
+
+        if (elapsed < duration) {
+          if (previewWrapRef.current) {
+            const dataUrl = await toPng(previewWrapRef.current, {
+              width: canvas.width,
+              height: canvas.height,
+              cacheBust: true,
+            });
+            const img = new Image();
+            img.src = dataUrl;
+            await new Promise((resolve) => {
+              img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                resolve(null);
+              };
+            });
+            recorder.requestData(); // 触发 dataavailable，收集当前视频片段
+          }
+          requestAnimationFrame(captureFrame);
+        } else {
+          recorder.stop();
+        }
+      };
+
+      captureFrame();
+    } catch (err) {
+      console.error('Export failed:', err);
+      setExportError('视频合成失败，请重试');
+      setIsExporting(false);
+    }
+  };
+
+  const downloadResult = () => {
+    if (!videoBlobUrl) return;
+    const link = document.createElement('a');
+    link.href = videoBlobUrl;
+    link.download = `hicolor_${activeAnimation}_video.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setShowExportSuccess(false);
+  };
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1920,54 +2683,332 @@ export default function App() {
       return `rgba(${blockData[idx]},${blockData[idx + 1]},${blockData[idx + 2]},${blockData[idx + 3] / 255})`;
     }
 
-    // 2. 主图画布：全图 + 条带采样色形状（叠字在条带画布上绘制，与拖拽框一致）
-    mainCtx.clearRect(0, 0, mainW, mainH);
-    mainCtx.drawImage(image, 0, 0, mainW, mainH);
+    // 2. 主图画布
+    // 非动画模式或未播放时：全图 + 条带采样色形状
+    // 动画播放时：清空形状，只显示原图+叠加效果
+    const isAnimationActive = isPlaying;
+    
+    if (!isAnimationActive) {
+      mainCtx.clearRect(0, 0, mainW, mainH);
+      // 先绘制色块背景
+      paintBlockFillOnContext(mainCtx, mainW, mainH, bgConfig, composition);
+      mainCtx.drawImage(image, 0, 0, mainW, mainH);
 
-    cutouts.forEach((c) => {
-      const currentSize =
-        (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) *
-        (mainW / 800);
-      const holeColor = sampleFromBlockData(c.x, c.y);
-      mainCtx.save();
-      mainCtx.translate(c.x * mainW, c.y * mainH);
-      mainCtx.rotate(c.angle);
-      fillCutoutShapeAtOrigin(
-        mainCtx,
-        c,
-        currentSize,
-        holeColor,
-        cutoutConfig.customShapeSymbol
-      );
+      cutouts.forEach((c) => {
+        const currentSize =
+          (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) *
+          (mainW / 800);
+        const holeColor = sampleFromBlockData(c.x, c.y);
+        mainCtx.save();
+        mainCtx.translate(c.x * mainW, c.y * mainH);
+        mainCtx.rotate(c.angle);
+        fillCutoutShapeAtOrigin(
+          mainCtx,
+          c,
+          currentSize,
+          holeColor,
+          cutoutConfig.customShapeSymbol
+        );
+        mainCtx.restore();
+      });
+    } else {
+      // 动画模式：清空后先绘制色块背景，再画原图
+      mainCtx.clearRect(0, 0, mainW, mainH);
+      paintBlockFillOnContext(mainCtx, mainW, mainH, bgConfig, composition);
+      mainCtx.drawImage(image, 0, 0, mainW, mainH);
+    }
+
+    // 3. 动画模式渲染：保持原图+色块，清空形状
+    if (activeAnimation === 'batch' && isPlaying) {
+      // 形状切换模式：每次切换显示不同形状类型和不同角度
+      cutouts.slice(0, 8).forEach((c, index) => {
+        const size = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (mainW / 800) * 1.2;
+        const holeColor = sampleFromBlockData(c.x, c.y);
+        
+        // 每次切换使用真正随机产生不同形状、角度和位置
+        const switchCycle = Math.floor(batchPositionOffset);
+        const randomBase = switchCycle * 1000 + index * 137;
+        const shapeOptions = ['circle', 'square', 'star', 'drop', 'snowflake'];
+        const selectedShape = shapeOptions[randomBase % shapeOptions.length];
+        const randomAngle = (randomBase * 137.508) % (Math.PI * 2);
+
+        // 位置偏移：随 switchCycle 和 index 产生周期性偏移
+        const posOffsetX = Math.sin(randomBase * 0.7) * size * 0.3;
+        const posOffsetY = Math.cos(randomBase * 0.5) * size * 0.3;
+
+        mainCtx.save();
+        mainCtx.translate(c.x * mainW + posOffsetX, c.y * mainH + posOffsetY);
+        mainCtx.rotate(randomAngle);
+        mainCtx.fillStyle = holeColor;
+        
+        // 绘制随机形状
+        if (selectedShape === 'circle') {
+          mainCtx.beginPath();
+          mainCtx.arc(0, 0, size / 2, 0, Math.PI * 2);
+          mainCtx.fill();
+        } else if (selectedShape === 'square') {
+          mainCtx.fillRect(-size / 2, -size / 2, size, size);
+        } else {
+          mainCtx.beginPath();
+          addShapePath(mainCtx, selectedShape as ShapeKind, size);
+          mainCtx.fill();
+        }
+        
+        mainCtx.restore();
+      });
+    } else if (activeAnimation === 'pulse' && isPlaying) {
+      // 形状叠加模式：形状从零到二十逐步叠加显示
+      // 根据 pulseRevealCount 计算显示的形状数量 (0-10 -> 0-20)
+      const rawCount = Math.floor(pulseRevealCount * 2);
+      const visibleCount = Math.min(20, Math.max(0, rawCount));
+      
+      // 绘制逐个叠加的形状
+      for (let i = 0; i < visibleCount && i < cutouts.length; i++) {
+        const c = cutouts[i];
+        const baseSize = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (mainW / 800);
+        const holeColor = sampleFromBlockData(c.x, c.y);
+        
+        mainCtx.save();
+        mainCtx.translate(c.x * mainW, c.y * mainH);
+        mainCtx.rotate(c.angle + pulseRevealCount * 0.1);
+        mainCtx.fillStyle = holeColor;
+        
+        // 使用元素的形状类型绘制（颜色与色块一致）
+        if (isGlyphShapeKind(c.shapeKind)) {
+          const char = cutoutGlyphChar(c, cutoutConfig.customShapeSymbol);
+          mainCtx.font = `bold ${baseSize}px sans-serif`;
+          mainCtx.textAlign = 'center';
+          mainCtx.textBaseline = 'middle';
+          mainCtx.fillText(char, 0, 0);
+        } else if (c.shapeKind) {
+          mainCtx.beginPath();
+          addShapePath(mainCtx, c.shapeKind, baseSize);
+          mainCtx.fill();
+        } else {
+          mainCtx.font = `bold ${baseSize}px sans-serif`;
+          mainCtx.textAlign = 'center';
+          mainCtx.textBaseline = 'middle';
+          mainCtx.fillText(c.char || 'A', 0, 0);
+        }
+        
+        mainCtx.restore();
+      }
+    } else if (activeAnimation === 'rainfall' && isPlaying) {
+      // 慢步雨季模式：只显示原图+色块，叠加雨滴效果
+      const rainStartY = mainH * (1 - blockStripRatio);
+      const rainEndY = mainH;
+      const currentY = rainStartY + (rainEndY - rainStartY) * rainfallOffset;
+      
+      const raindrops = 20;
+      for (let i = 0; i < raindrops; i++) {
+        const x = (mainW / raindrops) * i + mainW / (raindrops * 2);
+        const yOffset = Math.sin(i * 0.7 + rainfallOffset * 10) * 30;
+        const rainY = currentY + i * ((rainEndY - rainStartY) / raindrops) + yOffset;
+        const rainColor = sampleFromBlockData(x / mainW, rainY / mainH);
+        
+        mainCtx.save();
+        mainCtx.fillStyle = rainColor;
+        mainCtx.beginPath();
+        const dropX = x;
+        const dropY = rainY;
+        const dropSize = 6;
+        mainCtx.moveTo(dropX, dropY - dropSize);
+        mainCtx.bezierCurveTo(dropX + dropSize * 0.5, dropY - dropSize * 0.5, dropX + dropSize * 0.5, dropY + dropSize * 0.5, dropX, dropY + dropSize);
+        mainCtx.bezierCurveTo(dropX - dropSize * 0.5, dropY + dropSize * 0.5, dropX - dropSize * 0.5, dropY - dropSize * 0.5, dropX, dropY - dropSize);
+        mainCtx.fill();
+        mainCtx.restore();
+      }
+    } else if (activeAnimation === 'rain' && isPlaying) {
+      // 漫步雨季模式：满屏雨滴依次下降消失
+      // rainfallOffset 从 0 到 1，表示雨滴消失的进度
+      // offset=0 时满屏雨滴，offset=1 时雨滴消失
+      const disappearProgress = rainfallOffset;
+      const raindropCount = 40;
+      
+      for (let i = 0; i < raindropCount; i++) {
+        // 每个雨滴有自己的起始高度（随机分布）
+        const seed = i * 0.1;
+        const baseX = (Math.sin(seed * 3.7) * 0.5 + 0.5);
+        const baseY = (Math.cos(seed * 2.3) * 0.5 + 0.5);
+        const speed = 0.3 + (Math.sin(seed * 5.1) * 0.5 + 0.5) * 0.7;
+        
+        // 当前雨滴的位置（基于进度）
+        const dropProgress = (disappearProgress * speed) % 1;
+        const currentY = baseY + dropProgress;
+        
+        // 雨滴颜色从色块采样
+        const rainX = baseX * mainW;
+        const rainY = currentY * mainH;
+        const rainColor = sampleFromBlockData(baseX, currentY);
+        
+        mainCtx.save();
+        mainCtx.globalAlpha = 1 - disappearProgress;
+        mainCtx.fillStyle = rainColor;
+        
+        // 只绘制还在屏幕内的雨滴
+        if (currentY < 1.1 && 1 - disappearProgress > 0) {
+          const x = baseX * mainW;
+          const y = currentY * mainH;
+          const dropSize = 4 + Math.sin(seed * 7) * 2;
+          
+          mainCtx.globalAlpha = (1 - disappearProgress) * 0.8;
+          mainCtx.beginPath();
+          mainCtx.moveTo(x, y - dropSize);
+          mainCtx.bezierCurveTo(
+            x + dropSize * 0.5, y - dropSize * 0.5,
+            x + dropSize * 0.5, y + dropSize * 0.5,
+            x, y + dropSize
+          );
+          mainCtx.bezierCurveTo(
+            x - dropSize * 0.5, y + dropSize * 0.5,
+            x - dropSize * 0.5, y - dropSize * 0.5,
+            x, y - dropSize
+          );
+          mainCtx.fill();
+        }
+      }
+      mainCtx.globalAlpha = 1;
       mainCtx.restore();
-    });
+    } else if (activeAnimation === 'stars' && isPlaying) {
+      // 璀璨星河模式：只显示原图+色块，叠加星星发光效果
+      
+      // 绘制星星（使用雪花或星形）
+      mainCtx.save();
+      
+      // 主亮星（中心偏上）- 更大
+      const mainStarX = mainW * 0.5;
+      const mainStarY = mainH * 0.4;
+      const mainStarSize = Math.min(mainW, mainH) * 0.15;
+      
+      // 主星发光效果（渐进式发光）
+      const mainGlowRadius = mainStarSize * (1.5 + starBrightness * 2.5);
+      const mainGradient = mainCtx.createRadialGradient(
+        mainStarX, mainStarY, 0,
+        mainStarX, mainStarY, mainGlowRadius
+      );
+      const mainGlowAlpha = 0.6 + starBrightness * 0.4;
+      mainGradient.addColorStop(0, `rgba(255, 255, 240, ${mainGlowAlpha})`);
+      mainGradient.addColorStop(0.4, `rgba(255, 255, 200, ${mainGlowAlpha * 0.6})`);
+      mainGradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+      mainCtx.fillStyle = mainGradient;
+      mainCtx.beginPath();
+      mainCtx.arc(mainStarX, mainStarY, mainGlowRadius, 0, Math.PI * 2);
+      mainCtx.fill();
+      
+      // 绘制主星形状（根据 starBrightness 渐进显示，始终保持最小可见亮度 0.15）
+      mainCtx.fillStyle = `rgba(255, 255, 240, ${0.15 + starBrightness * 0.85})`;
+      drawStarShape(mainCtx, mainStarX, mainStarY, mainStarSize, 6);
+      
+      // 副星1（左上）- 较大
+      const star1X = mainW * 0.25;
+      const star1Y = mainH * 0.25;
+      const star1Size = mainStarSize * 0.6;
+      const star1Glow = mainStarSize * 0.8 * (0.5 + starBrightness * 0.5);
+      const star1Gradient = mainCtx.createRadialGradient(star1X, star1Y, 0, star1X, star1Y, star1Glow);
+      star1Gradient.addColorStop(0, `rgba(255, 255, 220, ${0.2 + starBrightness * 0.6})`);
+      star1Gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+      mainCtx.fillStyle = star1Gradient;
+      mainCtx.beginPath();
+      mainCtx.arc(star1X, star1Y, star1Glow, 0, Math.PI * 2);
+      mainCtx.fill();
+      mainCtx.fillStyle = `rgba(255, 255, 220, ${0.15 + starBrightness * 0.55})`;
+      drawStarShape(mainCtx, star1X, star1Y, star1Size, 5);
+      
+      // 副星2（右上）- 较大
+      const star2X = mainW * 0.75;
+      const star2Y = mainH * 0.3;
+      const star2Size = mainStarSize * 0.65;
+      const star2Glow = mainStarSize * 0.85 * (0.5 + starBrightness * 0.5);
+      const star2Gradient = mainCtx.createRadialGradient(star2X, star2Y, 0, star2X, star2Y, star2Glow);
+      star2Gradient.addColorStop(0, `rgba(255, 255, 220, ${0.2 + starBrightness * 0.6})`);
+      star2Gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+      mainCtx.fillStyle = star2Gradient;
+      mainCtx.beginPath();
+      mainCtx.arc(star2X, star2Y, star2Glow, 0, Math.PI * 2);
+      mainCtx.fill();
+      mainCtx.fillStyle = `rgba(255, 255, 220, ${0.15 + starBrightness * 0.6})`;
+      drawStarShape(mainCtx, star2X, star2Y, star2Size, 5);
+      
+      // 副星3（左下）
+      const star3X = mainW * 0.2;
+      const star3Y = mainH * 0.6;
+      const star3Size = mainStarSize * 0.5;
+      const star3Glow = mainStarSize * 0.7 * (0.5 + starBrightness * 0.5);
+      const star3Gradient = mainCtx.createRadialGradient(star3X, star3Y, 0, star3X, star3Y, star3Glow);
+      star3Gradient.addColorStop(0, `rgba(255, 255, 220, ${0.2 + starBrightness * 0.6})`);
+      star3Gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+      mainCtx.fillStyle = star3Gradient;
+      mainCtx.beginPath();
+      mainCtx.arc(star3X, star3Y, star3Glow, 0, Math.PI * 2);
+      mainCtx.fill();
+      mainCtx.fillStyle = `rgba(255, 255, 220, ${0.15 + starBrightness * 0.45})`;
+      drawStarShape(mainCtx, star3X, star3Y, star3Size, 5);
+      
+      // 副星4（右下）
+      const star4X = mainW * 0.8;
+      const star4Y = mainH * 0.65;
+      const star4Size = mainStarSize * 0.55;
+      const star4Glow = mainStarSize * 0.75 * (0.5 + starBrightness * 0.5);
+      const star4Gradient = mainCtx.createRadialGradient(star4X, star4Y, 0, star4X, star4Y, star4Glow);
+      star4Gradient.addColorStop(0, `rgba(255, 255, 220, ${0.2 + starBrightness * 0.6})`);
+      star4Gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+      mainCtx.fillStyle = star4Gradient;
+      mainCtx.beginPath();
+      mainCtx.arc(star4X, star4Y, star4Glow, 0, Math.PI * 2);
+      mainCtx.fill();
+      mainCtx.fillStyle = `rgba(255, 255, 220, ${0.15 + starBrightness * 0.5})`;
+      drawStarShape(mainCtx, star4X, star4Y, star4Size, 5);
+      
+      mainCtx.restore();
+    }
 
-    // 3. 主图仅保留条带采样色形状；透出原图只在条带画布
-    drawCutoutsWithPhotoReveal(
-      mainCtx,
-      mainW,
-      mainH,
-      image,
-      cutouts,
-      cutoutConfig,
-      selectedId,
-      true,
-      false
-    );
-
-    // 4. 条带预览画布：条纹 → 洞中照片 → 叠字（最上层）
+    // 4. 条带预览画布：条纹 → 洞中照片（动画模式显示色块） → 叠字（最上层）
     blockCtx.clearRect(0, 0, blockW, blockH);
     paintBlockFillOnContext(blockCtx, blockW, blockH, bgConfig, composition);
-    drawCutoutsWithPhotoReveal(
-      blockCtx,
-      blockW,
-      blockH,
-      image,
-      cutouts,
-      cutoutConfig,
-      null,
-      false
-    );
+    
+    // 动画模式：形状用纯色填充（孔洞露出色块）
+    if ((activeAnimation === 'batch' || activeAnimation === 'pulse' || activeAnimation === 'stars' || activeAnimation === 'rain' || activeAnimation === 'rainfall') && isPlaying) {
+      // 绘制形状（纯色填充，形状孔洞露出色块背景）
+      cutouts.forEach((c) => {
+        const currentSize =
+          (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) *
+          (blockW / 800);
+        blockCtx.save();
+        blockCtx.translate(c.x * blockW, c.y * blockH);
+        blockCtx.rotate(c.angle);
+        if (isGlyphShapeKind(c.shapeKind)) {
+          const char = cutoutGlyphChar(c, cutoutConfig.customShapeSymbol);
+          blockCtx.font = `bold ${currentSize}px sans-serif`;
+          blockCtx.textAlign = 'center';
+          blockCtx.textBaseline = 'middle';
+          blockCtx.fillStyle = cutoutConfig.shapeColor;
+          blockCtx.fillText(char, 0, 0);
+        } else if (c.shapeKind) {
+          blockCtx.beginPath();
+          addShapePath(blockCtx, c.shapeKind, currentSize);
+          blockCtx.fillStyle = cutoutConfig.shapeColor;
+          blockCtx.fill();
+        } else {
+          blockCtx.font = `bold ${currentSize}px sans-serif`;
+          blockCtx.textAlign = 'center';
+          blockCtx.textBaseline = 'middle';
+          blockCtx.fillStyle = cutoutConfig.shapeColor;
+          blockCtx.fillText(c.char || 'A', 0, 0);
+        }
+        blockCtx.restore();
+      });
+    } else {
+      drawCutoutsWithPhotoReveal(
+        blockCtx,
+        blockW,
+        blockH,
+        image,
+        cutouts,
+        cutoutConfig,
+        null,
+        false
+      );
+    }
     if (overlayTrim) {
       drawOverlayTextOnContext(
         blockCtx,
@@ -1982,7 +3023,8 @@ export default function App() {
         overlayTextConfig.fillColor,
         overlayTextConfig.strokeColor,
         cutoutConfig.shapeColor,
-        { mode: 'crop', sx: cropX, sy: cropY, sw: cropW, sh: cropH }
+        { mode: 'crop', sx: cropX, sy: cropY, sw: cropW, sh: cropH },
+        overlayTextConfig.usePhotoFill
       );
     }
   }, [
@@ -1996,6 +3038,13 @@ export default function App() {
     imagePos,
     overlayTextConfig,
     blockAreaPercent,
+    activeAnimation,
+    isPlaying,
+    batchShapeType,
+    batchPositionOffset,
+    pulseRevealCount,
+    rainfallOffset,
+    starBrightness,
   ]);
 
   const handleSave = async () => {
@@ -2029,7 +3078,8 @@ export default function App() {
         overlayTextConfig.fillColor,
         overlayTextConfig.strokeColor,
         cutoutConfig.shapeColor,
-        { mode: 'stretch-full' }
+        { mode: 'stretch-full' },
+        overlayTextConfig.usePhotoFill
       );
     }
 
@@ -2292,6 +3342,23 @@ export default function App() {
               </div>
             </div>
           </div>
+          {/* 图片填充开关 */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-gray-500">图片填充</span>
+            <button
+              type="button"
+              onClick={() => setOverlayTextConfig((prev) => ({ ...prev, usePhotoFill: !prev.usePhotoFill }))}
+              className={`relative w-11 h-6 rounded-full transition-colors ${
+                overlayTextConfig.usePhotoFill ? 'bg-emerald-500' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                  overlayTextConfig.usePhotoFill ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -2478,6 +3545,9 @@ export default function App() {
     >
       {icon}
       <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+      {id === 'video' && (
+        <span className="text-[7px] font-bold text-gray-400">待开发</span>
+      )}
       {activeTab === id && (
         <motion.div layoutId="tab-indicator" className="absolute bottom-0 w-8 h-1 bg-green-500 rounded-t-full" />
       )}
@@ -2517,6 +3587,7 @@ export default function App() {
       <div className="flex justify-around items-center h-14 px-4">
         {renderTabButton('background', <Palette size={22} />, '背景')}
         {renderTabButton('elements', <Target size={22} />, '元素')}
+        {renderTabButton('video', <Video size={22} />, '视频')}
       </div>
     </nav>
   );
@@ -2713,6 +3784,38 @@ export default function App() {
                       请点击画面中的位置进行取色...
                     </p>
                   )}
+
+                  {/* 纹理选择 */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">纹理</label>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {(
+                        [
+                          { type: 'none' as TextureType, label: '无' },
+                          { type: 'fine-paper' as TextureType, label: '细腻' },
+                          { type: 'fine-noise' as TextureType, label: '噪点' },
+                          { type: 'grain-paper' as TextureType, label: '颗粒' },
+                          { type: 'coarse-paper' as TextureType, label: '砂纸' },
+                        ]
+                      ).map(({ type, label }) => {
+                        const active = bgConfig.texture === type;
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setBgConfig((prev) => ({ ...prev, texture: type }))}
+                            className={`rounded-lg border py-2 text-center text-[9px] font-black shadow-sm transition-all ${
+                              active
+                                ? 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200/70'
+                                : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -3078,6 +4181,72 @@ export default function App() {
                 )}
             </motion.div>
           )}
+
+          {activeTab === 'video' && (
+            <motion.div
+              key="video"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-4"
+            >
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">动画模板</h3>
+              
+              {/* 动画模板选择 */}
+              <div className="grid grid-cols-2 gap-3">
+                <TemplateButton 
+                  label="形状叠加" 
+                  icon={<Maximize className="w-4 h-4" />} 
+                  active={activeAnimation === 'pulse'}
+                  onClick={() => handleAnimationSelect('pulse')}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); }}
+                />
+                <TemplateButton 
+                  label="形状切换" 
+                  icon={<Layers size={4} className="w-4 h-4" />} 
+                  active={activeAnimation === 'batch'}
+                  onClick={() => handleAnimationSelect('batch')}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); }}
+                />
+                <TemplateButton 
+                  label="漫步雨季" 
+                  icon={<CloudRain className="w-4 h-4" />} 
+                  active={activeAnimation === 'rain'}
+                  onClick={() => handleAnimationSelect('rain')}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); }}
+                />
+                <TemplateButton
+                  label="璀璨星河"
+                  icon={<Star className="w-4 h-4" />}
+                  active={activeAnimation === 'stars'}
+                  onClick={() => handleAnimationSelect('stars')}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); }}
+                />
+                <div className="relative">
+                  <button
+                    disabled
+                    className="w-full py-3 px-3 rounded-xl border border-dashed border-gray-300 bg-gray-50/50 text-gray-400 flex flex-col items-center justify-center gap-1 opacity-60 cursor-not-allowed"
+                  >
+                    <span className="text-[11px] font-bold">更多模板</span>
+                    <span className="text-[8px]">待开发</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 导出视频按钮 */}
+              <button
+                onClick={handleExport}
+                disabled={!image}
+                className={`w-full py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                  image
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/25'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <Video size={16} /><span>导出视频</span>
+              </button>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </div>
@@ -3282,6 +4451,104 @@ export default function App() {
                     </div>
                   );
                 })()}
+                
+                {/* 视频动画覆盖层 */}
+                {activeAnimation !== 'none' && isPlaying && activeAnimation !== 'batch' && activeAnimation !== 'pulse' && (
+                  <div className="absolute inset-0 pointer-events-none" ref={previewWrapRef}>
+                    {/* 雨季动画 */}
+                    {activeAnimation === 'rain' && RAINDROPS.map((drop) => {
+                      const dropColor = getRainDropColor(drop.x / 100, 0.5);
+                      return (
+                        <motion.div
+                          key={drop.id}
+                          initial={{ y: -20, opacity: 0 }}
+                          animate={{ y: 800, opacity: [0, 1, 1, 0] }}
+                          transition={{
+                            duration: drop.duration,
+                            delay: drop.delay,
+                            repeat: Infinity,
+                            ease: "linear"
+                          }}
+                          style={{
+                            position: 'absolute',
+                            left: `${drop.x}%`,
+                            top: 0,
+                          }}
+                        >
+                          <DropSVG size={12} style={{ color: dropColor }} />
+                        </motion.div>
+                      );
+                    })}
+                    
+                    {/* 星河开场动画 */}
+                    {activeAnimation === 'stars' && showStarsIntro && (
+                      <div className="absolute inset-0 z-10">
+                        {introStars.map((star) => (
+                          <motion.div
+                            key={star.id}
+                            initial={{ opacity: 0, scale: 0 }}
+                            animate={{
+                              opacity: [0, 1, 0.7, 1],
+                              scale: [0, 1.1, 1],
+                            }}
+                            transition={{
+                              duration: 2,
+                              delay: star.delay,
+                              ease: "easeInOut"
+                            }}
+                            style={{
+                              position: 'absolute',
+                              left: `${star.x}%`,
+                              top: `${star.y}%`,
+                            }}
+                          >
+                            <StarSVG
+                              size={star.size}
+                              className="text-yellow-300 drop-shadow-[0_0_12px_rgba(253,224,71,0.9)]"
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* 星河背景动画 */}
+                    {activeAnimation === 'stars' && !showStarsIntro && (
+                      <div className="absolute inset-0">
+                        {Array.from({ length: 60 }).map((_, i) => (
+                          <motion.div
+                            key={`star-bg-${i}`}
+                            initial={{ opacity: 0.15 }}
+                            animate={{ opacity: [0.15, 1, 0.15] }}
+                            transition={{
+                              duration: 1.5 + Math.random() * 2,
+                              repeat: Infinity,
+                              delay: Math.random() * 3
+                            }}
+                            style={{
+                              position: 'absolute',
+                              left: `${Math.random() * 100}%`,
+                              top: `${Math.random() * 100}%`,
+                            }}
+                          >
+                            <StarSVG className="text-white" size={8 + Math.random() * 12} />
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Play按钮覆盖层：仅在选中动画模板且未播放时显示 */}
+                {activeAnimation !== 'none' && !isPlaying && image && (
+                  <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                    <button
+                      onClick={() => setIsPlaying(true)}
+                      className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
+                    >
+                      <Play className="text-emerald-600 w-6 h-6 fill-emerald-600 ml-1" />
+                    </button>
+                  </div>
+                )}
               </div>
               <div
                 className="relative min-h-0 min-w-0 overflow-hidden leading-[0]"
@@ -3407,8 +4674,124 @@ export default function App() {
         />
       </main>
 
-      {image && renderSettingsPanel()}
+      {renderSettingsPanel()}
       {renderBottomNav()}
+
+      {/* 导出视频弹窗 */}
+      <AnimatePresence>
+        {isExporting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6"
+            >
+              <div className="relative w-24 h-24 mx-auto">
+                <svg className="w-full h-full" viewBox="0 0 100 100">
+                  <circle className="text-gray-100 stroke-current" strokeWidth="8" fill="transparent" r="40" cx="50" cy="50" />
+                  <motion.circle
+                    className="text-emerald-500 stroke-current"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    fill="transparent"
+                    r="40"
+                    cx="50"
+                    cy="50"
+                    style={{
+                      strokeDasharray: 251.2,
+                      strokeDashoffset: 251.2 - (251.2 * exportProgress) / 100
+                    }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-gray-900">
+                  {exportProgress}%
+                </div>
+              </div>
+              <div>
+                <h3 className="font-black text-xl text-gray-900">正在导出视频...</h3>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">请不要关闭页面</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 导出成功弹窗 */}
+      <AnimatePresence>
+        {showExportSuccess && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6"
+            >
+              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                <Video className="text-emerald-600 w-10 h-10" />
+              </div>
+              <div>
+                <h3 className="font-black text-2xl text-gray-900">导出成功！</h3>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">视频已准备就绪</p>
+              </div>
+              <div className="space-y-3 pt-4">
+                <button
+                  onClick={downloadResult}
+                  className="w-full bg-emerald-600 text-white py-3 rounded-xl font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-lg"
+                >
+                  下载 MP4
+                </button>
+                <button
+                  onClick={() => setShowExportSuccess(false)}
+                  className="w-full text-gray-400 font-bold py-2 hover:text-gray-600 transition-colors"
+                >
+                  返回编辑器
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 导出错误弹窗 */}
+      <AnimatePresence>
+        {exportError && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+                <X className="text-red-500 w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="font-black text-xl text-gray-900">导出失败</h3>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">{exportError}</p>
+              </div>
+              <button
+                onClick={() => setExportError(null)}
+                className="w-full bg-gray-900 text-white py-3 rounded-xl font-black uppercase tracking-widest hover:bg-gray-800 transition-colors"
+              >
+                我知道了
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
