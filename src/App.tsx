@@ -60,6 +60,44 @@ type CompositionMode = 'block-bottom' | 'block-top' | 'block-left' | 'block-righ
 type BackgroundType = 'solid' | 'split' | 'gradient' | 'image' | 'grid' | 'diagonal' | 'block' | 'dots';
 /** 底图纹理类型：无纹理 | 细腻纸张 | 细腻噪点 | 颗粒纸张 | 粗砂纸 */
 type TextureType = 'none' | 'fine-paper' | 'fine-noise' | 'grain-paper' | 'coarse-paper';
+
+/** 预计算的噪声遮罩缓存：key = `${w}x${h}-${type}-${seed}`，value = Float32Array(0-1归一化噪声) */
+const noiseMaskCache = new Map<string, Float32Array>();
+
+function getNoiseMask(w: number, h: number, textureType: TextureType, seed: number): Float32Array {
+  const cacheKey = `${w}x${h}-${textureType}-${seed}`;
+  if (noiseMaskCache.has(cacheKey)) {
+    return noiseMaskCache.get(cacheKey)!;
+  }
+
+  const mask = new Float32Array(w * h);
+  let s = seed;
+  const rng = () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+
+  let noiseDensity: number;
+  switch (textureType) {
+    case 'fine-paper': noiseDensity = 0.15; break;
+    case 'grain-paper': noiseDensity = 0.55; break;
+    case 'coarse-paper': noiseDensity = 0.85; break;
+    default: noiseDensity = 0.5;
+  }
+
+  for (let i = 0; i < w * h; i++) {
+    if (rng() < noiseDensity) {
+      mask[i] = (rng() - 0.5) * 2; // -1 to 1
+    }
+  }
+
+  noiseMaskCache.set(cacheKey, mask);
+  if (noiseMaskCache.size > 30) {
+    const firstKey = noiseMaskCache.keys().next().value;
+    if (firstKey) noiseMaskCache.delete(firstKey);
+  }
+  return mask;
+}
 type CreationMode = 'auto' | 'manual';
 type DistributionMode = 'sync' | 'scatter';
 /** 元素面板内：形状挖空 / 画布叠字 */
@@ -89,6 +127,7 @@ interface Cutout {
 /** 画布叠字字体预设（已在 index.html 中加载） */
 const TEXT_FONT_PRESETS: { value: string; label: string }[] = [
   { value: '"Noto Sans SC", sans-serif', label: '黑体' },
+  { value: '"Homemade Apple", cursive', label: 'Homemade' },
   { value: '"Cinzel", serif', label: 'Cinzel' },
   { value: '"Oswald", sans-serif', label: 'Oswald' },
   { value: '"Bebas Neue", sans-serif', label: 'Bebas' },
@@ -714,117 +753,74 @@ function applyPaperTexture(
   const imageData = ctx.getImageData(0, 0, w, h);
   const data = imageData.data;
 
-  // 获取平均亮度，用于调整纹理强度
+  // 获取平均亮度
   let totalBrightness = 0;
   for (let i = 0; i < data.length; i += 4) {
     totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
   }
   const avgBrightness = totalBrightness / (data.length / 4);
-  const brightnessFactor = avgBrightness > 128 ? 1 : 0.7; // 暗色背景纹理要弱一些
+  const brightnessFactor = avgBrightness > 128 ? 1 : 0.7;
 
-  // 根据纹理类型设置参数
-  let noiseDensity: number;
   let noiseStrength: number;
-  let useColorNoise: boolean;
-
   switch (textureType) {
     case 'fine-paper':
-      // 细腻纸张：极低密度、极低强度，微弱颗粒感
-      noiseDensity = 0.15;
       noiseStrength = 6 * brightnessFactor * strengthMultiplier;
-      useColorNoise = false;
-      break;
-    case 'fine-noise':
-      // 像素风：使用更大的像素块效果
-      noiseDensity = 0.6;
-      noiseStrength = 20 * brightnessFactor * strengthMultiplier;
-      useColorNoise = true;
       break;
     case 'grain-paper':
-      // 颗粒纸张：中高密度、中高强度
-      noiseDensity = 0.55;
       noiseStrength = 22 * brightnessFactor * strengthMultiplier;
-      useColorNoise = false;
       break;
     case 'coarse-paper':
-      // 粗砂纸：最高密度、高强度，明显颗粒感
-      noiseDensity = 0.85;
       noiseStrength = 35 * brightnessFactor * strengthMultiplier;
-      useColorNoise = false;
       break;
     default:
       return;
   }
 
-  // 使用高质量随机数生成器（线性同余生成器）确保纹理稳定性
-  let seed = 12345;
-  const random = () => {
-    seed = (seed * 1664525 + 1013904223) & 0xffffffff;
-    return (seed >>> 0) / 0xffffffff;
-  };
-
-  const pixelCount = data.length / 4;
-
-  for (let i = 0; i < pixelCount; i++) {
+  // 使用预计算的噪声遮罩
+  const mask = getNoiseMask(w, h, textureType, 12345);
+  for (let i = 0; i < w * h; i++) {
+    const noise = mask[i] * noiseStrength;
+    if (Math.abs(noise) < 0.1) continue;
     const idx = i * 4;
-
-    // 只对一定比例的像素应用噪声，实现纹理感而非全像素噪声
-    if (random() > noiseDensity) continue;
-
-    // 生成与位置相关的噪声
-    const noiseX = (i % w);
-    const noiseY = Math.floor(i / w);
-    const noiseVal = (Math.sin(noiseX * 12.9898 + noiseY * 78.233) * 43758.5453) % 1;
-    const signedNoise = noiseVal - 0.5;
-
-    // 应用噪声到每个通道
-    for (let c = 0; c < 3; c++) {
-      let noise = signedNoise * noiseStrength;
-      if (useColorNoise) {
-        // 为 RGB 各通道添加略微不同的噪声，产生色彩噪点效果
-        noise *= (0.8 + random() * 0.4);
-      }
-      data[idx + c] = Math.min(255, Math.max(0, data[idx + c] + noise));
-    }
+    data[idx]     = Math.min(255, Math.max(0, data[idx]     + noise));
+    data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + noise));
+    data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + noise));
   }
 
   ctx.putImageData(imageData, 0, 0);
 }
 
-// 像素风纹理：使用固定的像素块效果
+// 像素风纹理：使用固定的像素块效果（带缓存）
 function applyPixelTexture(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
   strength: number
 ) {
-  const pixelSize = 4; // 像素块大小
   const imageData = ctx.getImageData(0, 0, w, h);
   const data = imageData.data;
+  const pixelSize = 4;
 
-  // 使用时间作为种子，每次都有不同的随机效果
-  const seed = Date.now() % 1000000;
-  let currentSeed = seed;
-  const random = () => {
-    currentSeed = (currentSeed * 1664525 + 1013904223) & 0xffffffff;
-    return (currentSeed >>> 0) / 0xffffffff;
-  };
+  // 使用预计算的像素块噪声
+  const blockCountX = Math.ceil(w / pixelSize);
+  const blockCountY = Math.ceil(h / pixelSize);
+  const blockSeed = Math.round(strength);
+  const blockMask = getNoiseMask(blockCountX, blockCountY, 'fine-noise', blockSeed);
 
   for (let py = 0; py < h; py += pixelSize) {
     for (let px = 0; px < w; px += pixelSize) {
-      // 为每个像素块计算一个随机亮度偏移（-strength 到 +strength）
-      const brightnessOffset = (random() - 0.5) * strength * 2;
-      // 随机色彩偏移，模拟像素游戏的色彩抖动
-      const colorShift = (random() - 0.5) * strength * 0.3;
+      const bx = Math.floor(px / pixelSize);
+      const by = Math.floor(py / pixelSize);
+      const bIdx = by * blockCountX + bx;
+      const brightnessOffset = blockMask[bIdx] * strength;
+      const colorShift = (Math.abs(blockMask[bIdx]) > 0.5 ? blockMask[bIdx] * 0.5 : 0) * strength * 0.3;
 
-      // 对像素块内的每个像素应用相同的偏移
       for (let dy = 0; dy < pixelSize && py + dy < h; dy++) {
         for (let dx = 0; dx < pixelSize && px + dx < w; dx++) {
           const idx = ((py + dy) * w + (px + dx)) * 4;
-          // RGB分别应用不同的偏移，模拟色彩抖动
-          data[idx] = Math.min(255, Math.max(0, data[idx] + brightnessOffset + colorShift * random()));
-          data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + brightnessOffset + colorShift * random()));
-          data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + brightnessOffset + colorShift * random()));
+          data[idx]     = Math.min(255, Math.max(0, data[idx]     + brightnessOffset + colorShift));
+          data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + brightnessOffset + colorShift));
+          data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + brightnessOffset + colorShift));
         }
       }
     }
