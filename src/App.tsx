@@ -1929,6 +1929,7 @@ export default function App() {
   // --- Refs ---
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const blockCanvasRef = useRef<HTMLCanvasElement>(null);
+  const recordCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bgImageInputRef = useRef<HTMLInputElement>(null);
   const resizeDragRef = useRef<{
@@ -2240,110 +2241,270 @@ export default function App() {
       setExportError('请先选择一个动画模板');
       return;
     }
-    if (!previewWrapRef.current) {
-      setExportError('预览区域未加载，请稍后重试');
-      return;
-    }
-    
-    // 如果动画还没开始播放，先开始播放
-    if (!isPlaying) {
-      setIsPlaying(true);
-    }
-    
+
     setExportError(null);
     setIsExporting(true);
     setExportProgress(0);
     setVideoBlobUrl(null);
 
     try {
+      // 直接使用主画布和色块画布的尺寸，不依赖 previewWrapRef
+      const r = blockStripRatio;
+      const { mainW, mainH, blockW, blockH, cropX, cropY, sw: cropW, sh: cropH } =
+        getLayoutDimensions(composition, r, image.width, image.height);
+
+      const horiz = composition === 'block-left' || composition === 'block-right';
+      const recW = horiz ? mainW + blockW : Math.max(mainW, blockW);
+      const recH = horiz ? Math.max(mainH, blockH) : mainH + blockH;
+
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('无法创建绘图上下文');
+      canvas.width = recW;
+      canvas.height = recH;
+      const ctx = canvas.getContext('2d')!;
+      applyHighFidelity2d(ctx);
 
-      const rect = previewWrapRef.current.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      // 创建录制画布并复用
+      if (!recordCanvasRef.current || recordCanvasRef.current.width !== recW || recordCanvasRef.current.height !== recH) {
+        recordCanvasRef.current = document.createElement('canvas');
+        recordCanvasRef.current.width = recW;
+        recordCanvasRef.current.height = recH;
+      }
+      const recCtx = recordCanvasRef.current.getContext('2d')!;
+      applyHighFidelity2d(recCtx);
 
-      const stream = canvas.captureStream(30);
+      // 建立截图用的离屏画布（mainW×mainH 和 blockW×blockH）
+      const mainSnap = document.createElement('canvas');
+      mainSnap.width = mainW;
+      mainSnap.height = mainH;
+      const mainSnapCtx = mainSnap.getContext('2d')!;
+
+      const blockSnap = document.createElement('canvas');
+      blockSnap.width = blockW;
+      blockSnap.height = blockH;
+      const blockSnapCtx = blockSnap.getContext('2d')!;
+
+      // 复用主画布和色块画布绘制结果（截图时暂停主画布更新）
+      const captureMain = () => {
+        const mc = mainCanvasRef.current;
+        if (!mc) return;
+        mainSnapCtx.clearRect(0, 0, mainW, mainH);
+        mainSnapCtx.drawImage(mc, 0, 0);
+      };
+      const captureBlock = () => {
+        const bc = blockCanvasRef.current;
+        if (!bc) return;
+        blockSnapCtx.clearRect(0, 0, blockW, blockH);
+        blockSnapCtx.drawImage(bc, 0, 0);
+      };
+
+      // 预计算条带采样（用于雨滴取色）
+      const sampleCvs = document.createElement('canvas');
+      sampleCvs.width = blockW;
+      sampleCvs.height = blockH;
+      const sampleCtx = sampleCvs.getContext('2d')!;
+      const overlayTrim = overlayTextConfig.content.trim();
+      paintBlockFillOnContext(sampleCtx, blockW, blockH, bgConfig, composition);
+      const blockImageData = sampleCtx.getImageData(0, 0, blockW, blockH);
+      const sampleFromBlockData = (nx: number, ny: number): string => {
+        const xi = Math.max(0, Math.min(blockW - 1, Math.floor(nx * blockW)));
+        const yi = Math.max(0, Math.min(blockH - 1, Math.floor(ny * blockH)));
+        const i = (yi * blockW + xi) * 4;
+        return `rgb(${blockImageData.data[i]},${blockImageData.data[i + 1]},${blockImageData.data[i + 2]})`;
+      };
+
+      // 流 & 录制器
+      const stream = canvas.captureStream(60);
+      const mimeTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+      const supportedType = mimeTypes.find(t => {
+        try { return MediaRecorder.isTypeSupported(t); } catch { return false; }
+      }) || 'video/webm';
+      const isMp4 = supportedType.startsWith('video/mp4');
+
       const recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: 5000000,
+        mimeType: supportedType,
+        videoBitsPerSecond: 8000000,
       });
 
       const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
       recorder.onstop = async () => {
         const webmBlob = new Blob(chunks, { type: 'video/webm' });
 
-        // 确保 FFmpeg 已加载
-        if (!ffmpegRef.current) {
-          const ffmpeg = new FFmpeg();
-          const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-          await ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-          });
-          ffmpegRef.current = ffmpeg;
-          setFfmpegLoaded(true);
+        if (isMp4) {
+          // 确保 FFmpeg 已加载
+          if (!ffmpegRef.current) {
+            const ffmpeg = new FFmpeg();
+            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+            await ffmpeg.load({
+              coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+              wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+            });
+            ffmpegRef.current = ffmpeg;
+            setFfmpegLoaded(true);
+          }
+          const ffmpeg = ffmpegRef.current;
+          await ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+          await ffmpeg.exec([
+            '-i', 'input.webm', '-c:v', 'libx264', '-preset', 'fast',
+            '-crf', '23', '-c:a', 'aac', '-b:a', '128k', 'output.mp4'
+          ]);
+          const data = await ffmpeg.readFile('output.mp4');
+          const mp4Blob = new Blob([data], { type: 'video/mp4' });
+          const url = URL.createObjectURL(mp4Blob);
+          setVideoBlobUrl(url);
+          setVideoMimeType('video/mp4');
+        } else {
+          const url = URL.createObjectURL(webmBlob);
+          setVideoBlobUrl(url);
+          setVideoMimeType('video/webm');
         }
 
-        const ffmpeg = ffmpegRef.current;
-        await ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
-        await ffmpeg.exec([
-          '-i', 'input.webm',
-          '-c:v', 'libx264',
-          '-preset', 'fast',
-          '-crf', '23',
-          '-c:a', 'aac',
-          '-b:a', '128k',
-          'output.mp4'
-        ]);
-        const data = await ffmpeg.readFile('output.mp4');
-        const mp4Blob = new Blob([data], { type: 'video/mp4' });
-        const url = URL.createObjectURL(mp4Blob);
-        setVideoBlobUrl(url);
-        setVideoMimeType('video/mp4');
         setIsExporting(false);
         setShowExportSuccess(true);
       };
 
       recorder.start();
 
-      const duration = 3000;
-      const startTime = Date.now();
-      
-      const captureFrame = async () => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(100, Math.round((elapsed / duration) * 100));
-        setExportProgress(progress);
+      // 动画参数
+      const DURATION = 3000; // ms
+      const startTime = performance.now();
 
-        if (elapsed < duration) {
-          if (previewWrapRef.current) {
-            const dataUrl = await toPng(previewWrapRef.current, {
-              width: canvas.width,
-              height: canvas.height,
-              cacheBust: true,
-            });
-            const img = new Image();
-            img.src = dataUrl;
-            await new Promise((resolve) => {
-              img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
-                resolve(null);
-              };
-            });
-            recorder.requestData(); // 触发 dataavailable，收集当前视频片段
+      let rainfallVal = 0;   // 0→1 (rain / rainfall)
+      let starVal = 0;        // 0→1 (stars)
+      let pulseVal = 0;       // 0→1 (pulse)
+      let batchVal = 0;       // 0→1 (batch)
+
+      const captureFrame = () => {
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(1, elapsed / DURATION);
+        setExportProgress(Math.round(t * 100));
+
+        // 绘制底图
+        ctx.clearRect(0, 0, recW, recH);
+        if (composition === 'block-right') {
+          ctx.drawImage(mainSnap, 0, 0);
+          ctx.drawImage(blockSnap, mainW, 0);
+        } else if (composition === 'block-left') {
+          ctx.drawImage(blockSnap, 0, 0);
+          ctx.drawImage(mainSnap, blockW, 0);
+        } else if (composition === 'block-bottom') {
+          ctx.drawImage(mainSnap, 0, 0);
+          ctx.drawImage(blockSnap, 0, mainH);
+        } else {
+          ctx.drawImage(blockSnap, 0, 0);
+          ctx.drawImage(mainSnap, 0, blockH);
+        }
+
+        // 叠加动画效果（绘制在 recCtx 上，然后合成到 ctx）
+        if (activeAnimation !== 'none') {
+          // 同步动画参数
+          if (activeAnimation === 'rain') rainfallVal = t;
+          if (activeAnimation === 'rainfall') rainfallVal = t;
+          if (activeAnimation === 'stars') starVal = t;
+          if (activeAnimation === 'pulse') pulseVal = t;
+          if (activeAnimation === 'batch') batchVal = t;
+
+          // 雨季动画 (rain / rainfall)
+          if ((activeAnimation === 'rain' || activeAnimation === 'rainfall') && isPlaying) {
+            const raindropCount = 40;
+            for (let i = 0; i < raindropCount; i++) {
+              const rx = (mainW / raindropCount) * i + mainW / (raindropCount * 2);
+              const rainY = mainH * rainfallVal + i * (mainH / raindropCount);
+              if (rainY < 0 || rainY >= mainH) continue;
+              const rc = sampleFromBlockData(rx / mainW, rainY / mainH);
+              ctx.fillStyle = rc;
+              ctx.beginPath();
+              ctx.ellipse(rx, rainY, 3, 10, 0, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
+
+          // 星星动画 (stars)
+          if (activeAnimation === 'stars' && isPlaying) {
+            const drawStarOnCtx = (starCtx: CanvasRenderingContext2D, sx: number, sy: number, size: number, pts: number, alpha: number) => {
+              starCtx.save();
+              starCtx.fillStyle = `rgba(255,255,240,${alpha})`;
+              starCtx.beginPath();
+              for (let pi = 0; pi < pts * 2; pi++) {
+                const angle = (pi * Math.PI) / pts - Math.PI / 2;
+                const radius = pi % 2 === 0 ? size : size * 0.4;
+                const px = sx + Math.cos(angle) * radius;
+                const py = sy + Math.sin(angle) * radius;
+                pi === 0 ? starCtx.moveTo(px, py) : starCtx.lineTo(px, py);
+              }
+              starCtx.closePath();
+              starCtx.fill();
+              starCtx.restore();
+            };
+            const mainStarX = mainW / 2;
+            const mainStarY = mainH * 0.4;
+            const mainStarSize = Math.min(mainW, mainH) * 0.15;
+            const mainGlowRadius = mainStarSize * (1.5 + starVal * 2.5);
+            const mainGlowAlpha = 0.6 + starVal * 0.4;
+            const mainGlow = ctx.createRadialGradient(mainStarX, mainStarY, 0, mainStarX, mainStarY, mainGlowRadius);
+            mainGlow.addColorStop(0, `rgba(255,255,240,${mainGlowAlpha})`);
+            mainGlow.addColorStop(0.4, `rgba(255,255,200,${mainGlowAlpha * 0.6})`);
+            mainGlow.addColorStop(1, 'rgba(255,255,200,0)');
+            ctx.fillStyle = mainGlow;
+            ctx.beginPath();
+            ctx.arc(mainStarX, mainStarY, mainGlowRadius, 0, Math.PI * 2);
+            ctx.fill();
+            drawStarOnCtx(ctx, mainStarX, mainStarY, mainStarSize, 6, 0.15 + starVal * 0.85);
+            drawStarOnCtx(ctx, mainW * 0.25, mainH * 0.25, mainStarSize * 0.6, 5, 0.15 + starVal * 0.55);
+            drawStarOnCtx(ctx, mainW * 0.75, mainH * 0.3, mainStarSize * 0.65, 5, 0.15 + starVal * 0.6);
+            drawStarOnCtx(ctx, mainW * 0.2, mainH * 0.6, mainStarSize * 0.5, 5, 0.15 + starVal * 0.45);
+            drawStarOnCtx(ctx, mainW * 0.8, mainH * 0.65, mainStarSize * 0.55, 5, 0.15 + starVal * 0.5);
+          }
+
+          // pulse 动画
+          if (activeAnimation === 'pulse' && isPlaying) {
+            const holeColor = cutoutConfig.shapeColor;
+            cutouts.forEach((c) => {
+              const rawCount = Math.floor(pulseVal * 2);
+              const visibleCount = Math.min(20, Math.max(0, rawCount));
+              const idx = cutouts.indexOf(c);
+              if (idx >= visibleCount) return;
+              ctx.save();
+              ctx.translate(c.x * mainW, c.y * mainH);
+              ctx.rotate(c.angle + pulseVal * 0.1);
+              ctx.fillStyle = holeColor;
+              const sz = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (mainW / 800);
+              if (c.shapeKind === 'circle' || !c.shapeKind) {
+                ctx.beginPath(); ctx.arc(0, 0, sz, 0, Math.PI * 2); ctx.fill();
+              } else if (c.shapeKind === 'square') {
+                ctx.fillRect(-sz, -sz, sz * 2, sz * 2);
+              } else if (c.shapeKind === 'star') {
+                const drawS = (ctx as any).constructor.prototype.drawStar
+                  || ((ctx as any)._drawStarFn ? (ctx as any)._drawStarFn(ctx, 0, 0, sz, 5) : null);
+                if (!drawS) {
+                  for (let pi = 0; pi < 10; pi++) {
+                    const angle = (pi * Math.PI) / 5 - Math.PI / 2;
+                    const radius = pi % 2 === 0 ? sz : sz * 0.4;
+                    pi === 0 ? ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius) : ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+                  }
+                  ctx.closePath(); ctx.fill();
+                }
+              }
+              ctx.restore();
+            });
+          }
+        }
+
+        recorder.requestData();
+
+        if (t < 1) {
           requestAnimationFrame(captureFrame);
         } else {
           recorder.stop();
         }
       };
 
+      // 截图一次主画布和色块画布，然后开始动画录制
+      captureMain();
+      captureBlock();
       captureFrame();
+
     } catch (err) {
       console.error('Export failed:', err);
       setExportError('视频合成失败，请重试');
