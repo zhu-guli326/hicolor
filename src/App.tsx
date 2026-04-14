@@ -89,6 +89,7 @@ interface Cutout {
 /** 画布叠字字体预设（已在 index.html 中加载） */
 const TEXT_FONT_PRESETS: { value: string; label: string }[] = [
   { value: '"Noto Sans SC", sans-serif', label: '黑体' },
+  { value: '"Cinzel", serif', label: 'Cinzel' },
   { value: '"Oswald", sans-serif', label: 'Oswald' },
   { value: '"Bebas Neue", sans-serif', label: 'Bebas' },
   { value: '"Anton", sans-serif', label: 'Anton' },
@@ -110,7 +111,6 @@ const TEXT_FONT_PRESETS: { value: string; label: string }[] = [
   { value: '"Syncopate", sans-serif', label: 'Syncopate' },
   { value: '"Poiret One", cursive', label: 'Poiret' },
   { value: '"Comfortaa", cursive', label: 'Comfortaa' },
-  { value: '"Cinzel", serif', label: 'Cinzel' },
   { value: '"Yeseva One", cursive', label: 'Yeseva' },
   { value: '"Lobster", cursive', label: 'Lobster' },
   { value: '"Orbitron", sans-serif', label: 'Orbitron' },
@@ -706,7 +706,8 @@ function applyPaperTexture(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  textureType: TextureType
+  textureType: TextureType,
+  strengthMultiplier: number = 1.0
 ) {
   if (textureType === 'none') return;
 
@@ -728,27 +729,27 @@ function applyPaperTexture(
 
   switch (textureType) {
     case 'fine-paper':
-      // 细腻纸张：低密度、低强度
-      noiseDensity = 0.4;
-      noiseStrength = 12 * brightnessFactor;
+      // 细腻纸张：极低密度、极低强度，微弱颗粒感
+      noiseDensity = 0.15;
+      noiseStrength = 6 * brightnessFactor * strengthMultiplier;
       useColorNoise = false;
       break;
     case 'fine-noise':
-      // 细腻噪点：中密度、中强度、轻微色彩噪点
+      // 像素风：使用更大的像素块效果
       noiseDensity = 0.6;
-      noiseStrength = 15 * brightnessFactor;
+      noiseStrength = 20 * brightnessFactor * strengthMultiplier;
       useColorNoise = true;
       break;
     case 'grain-paper':
-      // 颗粒纸张：高密度、中高强度
-      noiseDensity = 0.8;
-      noiseStrength = 18 * brightnessFactor;
+      // 颗粒纸张：中高密度、中高强度
+      noiseDensity = 0.55;
+      noiseStrength = 22 * brightnessFactor * strengthMultiplier;
       useColorNoise = false;
       break;
     case 'coarse-paper':
-      // 粗砂纸：最高密度、高强度
-      noiseDensity = 1.0;
-      noiseStrength = 25 * brightnessFactor;
+      // 粗砂纸：最高密度、高强度，明显颗粒感
+      noiseDensity = 0.85;
+      noiseStrength = 35 * brightnessFactor * strengthMultiplier;
       useColorNoise = false;
       break;
     default:
@@ -784,6 +785,48 @@ function applyPaperTexture(
         noise *= (0.8 + random() * 0.4);
       }
       data[idx + c] = Math.min(255, Math.max(0, data[idx + c] + noise));
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// 像素风纹理：使用固定的像素块效果
+function applyPixelTexture(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  strength: number
+) {
+  const pixelSize = 4; // 像素块大小
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  // 使用时间作为种子，每次都有不同的随机效果
+  const seed = Date.now() % 1000000;
+  let currentSeed = seed;
+  const random = () => {
+    currentSeed = (currentSeed * 1664525 + 1013904223) & 0xffffffff;
+    return (currentSeed >>> 0) / 0xffffffff;
+  };
+
+  for (let py = 0; py < h; py += pixelSize) {
+    for (let px = 0; px < w; px += pixelSize) {
+      // 为每个像素块计算一个随机亮度偏移（-strength 到 +strength）
+      const brightnessOffset = (random() - 0.5) * strength * 2;
+      // 随机色彩偏移，模拟像素游戏的色彩抖动
+      const colorShift = (random() - 0.5) * strength * 0.3;
+
+      // 对像素块内的每个像素应用相同的偏移
+      for (let dy = 0; dy < pixelSize && py + dy < h; dy++) {
+        for (let dx = 0; dx < pixelSize && px + dx < w; dx++) {
+          const idx = ((py + dy) * w + (px + dx)) * 4;
+          // RGB分别应用不同的偏移，模拟色彩抖动
+          data[idx] = Math.min(255, Math.max(0, data[idx] + brightnessOffset + colorShift * random()));
+          data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + brightnessOffset + colorShift * random()));
+          data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + brightnessOffset + colorShift * random()));
+        }
+      }
     }
   }
 
@@ -913,9 +956,49 @@ function paintBlockFillOnContext(
     ctx.fillRect(0, 0, w, h);
   }
 
-  // 绘制纹理
+  // 绘制纹理 - 不同背景类型使用不同纹理强度
   if (bgConfig.texture !== 'none') {
-    applyPaperTexture(ctx, w, h, bgConfig.texture);
+    // 根据背景类型调整纹理强度
+    let textureStrengthMultiplier = 1.0;
+    switch (bgConfig.type) {
+      case 'solid':
+        // 纯色：纹理最明显
+        textureStrengthMultiplier = 1.2;
+        break;
+      case 'split':
+        // 双拼色：纹理适中
+        textureStrengthMultiplier = 1.0;
+        break;
+      case 'gradient':
+        // 渐变：纹理较弱，避免干扰渐变效果
+        textureStrengthMultiplier = 0.6;
+        break;
+      case 'grid':
+        // 笔记本：纹理很弱，保持线条清晰
+        textureStrengthMultiplier = 0.4;
+        break;
+      case 'diagonal':
+        // 格子：纹理弱，保持格子清晰
+        textureStrengthMultiplier = 0.5;
+        break;
+      case 'block':
+        // 棋盘格：纹理适中
+        textureStrengthMultiplier = 0.7;
+        break;
+      case 'dots':
+        // 点阵：纹理弱，保持点阵清晰
+        textureStrengthMultiplier = 0.4;
+        break;
+      default:
+        textureStrengthMultiplier = 1.0;
+    }
+
+    // 像素风使用特殊的像素块效果
+    if (bgConfig.texture === 'fine-noise') {
+      applyPixelTexture(ctx, w, h, 25 * textureStrengthMultiplier);
+    } else {
+      applyPaperTexture(ctx, w, h, bgConfig.texture, textureStrengthMultiplier);
+    }
   }
 }
 
@@ -1825,8 +1908,8 @@ export default function App() {
 
   const [overlayTextConfig, setOverlayTextConfig] = useState({
     content: '',
-    fontSize: 52,
-    fontFamily: '"Bungee Inline", cursive',
+    fontSize: 35,
+    fontFamily: '"Special Elite", cursive',
     fillColor: '#ffffff',
     strokeColor: '#ffffff',
     /** 叠字在画面中的相对位置 (0–1)，默认居中 */
@@ -3557,7 +3640,15 @@ export default function App() {
   const renderHeader = () => (
     <header className="fixed top-0 left-0 right-0 z-50 flex min-h-14 items-center justify-between border-b border-gray-100 bg-white/80 px-3 pt-[max(0px,env(safe-area-inset-top))] pb-2 backdrop-blur-xl sm:min-h-16 sm:px-6 sm:pb-0">
       <div className="flex items-center">
-        <h1 className="text-lg font-black tracking-tighter text-gray-900 italic leading-none sm:text-xl">hicolor</h1>
+        <a 
+          href="https://www.xiaohongshu.com/user/profile/57b3456c82ec3947f79496e9" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-lg font-black tracking-tighter text-gray-900 italic leading-none sm:text-xl hover:text-emerald-600 transition-colors cursor-pointer"
+          title="访问小红书"
+        >
+          hicolor
+        </a>
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <button 
@@ -3694,9 +3785,47 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 色彩：随类型显示 */}
+              {/* 纹理选择 - 移到色彩配置上方 */}
               {bgConfig.type !== 'image' && (
-                <div className="space-y-2">
+                <div className="space-y-2 pr-10">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">纹理</label>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {(
+                      [
+                        { type: 'none' as TextureType, label: '无' },
+                        { type: 'fine-paper' as TextureType, label: '像素风' },
+                        { type: 'fine-noise' as TextureType, label: '牛皮纸' },
+                        { type: 'grain-paper' as TextureType, label: '颗粒' },
+                        { type: 'coarse-paper' as TextureType, label: '砂纸' },
+                      ]
+                    ).map(({ type, label }) => {
+                      const active = bgConfig.texture === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            console.log('纹理按钮点击:', type);
+                            setBgConfig((prev) => ({ ...prev, texture: type }));
+                          }}
+                          className={`rounded-lg border py-2 text-center text-[9px] font-black shadow-sm transition-all cursor-pointer ${
+                            active
+                              ? 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200/70'
+                              : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
+                          }`}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 色彩配置 */}
+              {bgConfig.type !== 'image' && (
+                <div className="space-y-2 pr-10">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                     {bgConfig.type === 'solid' ? '背景颜色' : '色彩配置'}
                   </label>
@@ -3784,43 +3913,11 @@ export default function App() {
                       请点击画面中的位置进行取色...
                     </p>
                   )}
-
-                  {/* 纹理选择 */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">纹理</label>
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {(
-                        [
-                          { type: 'none' as TextureType, label: '无' },
-                          { type: 'fine-paper' as TextureType, label: '细腻' },
-                          { type: 'fine-noise' as TextureType, label: '噪点' },
-                          { type: 'grain-paper' as TextureType, label: '颗粒' },
-                          { type: 'coarse-paper' as TextureType, label: '砂纸' },
-                        ]
-                      ).map(({ type, label }) => {
-                        const active = bgConfig.texture === type;
-                        return (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => setBgConfig((prev) => ({ ...prev, texture: type }))}
-                            className={`rounded-lg border py-2 text-center text-[9px] font-black shadow-sm transition-all ${
-                              active
-                                ? 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200/70'
-                                : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
               )}
 
               {bgConfig.type === 'split' && (
-                <div className="space-y-2">
+                <div className="space-y-2 pr-10">
                   <div className="flex justify-between items-end">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">条纹宽度</label>
                     <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.stripeSize}px</span>
@@ -3838,7 +3935,7 @@ export default function App() {
               )}
 
               {(bgConfig.type === 'grid' || bgConfig.type === 'diagonal' || bgConfig.type === 'block' || bgConfig.type === 'dots') && (
-                <div className="space-y-2">
+                <div className="space-y-2 pr-10">
                   <div className="flex justify-between items-end">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em">图案密度</label>
                     <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.stripeSize}px</span>
@@ -3856,7 +3953,7 @@ export default function App() {
               )}
 
               {bgConfig.type === 'gradient' && (
-                <div className="space-y-2">
+                <div className="space-y-2 pr-10">
                   <div className="flex justify-between items-end">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">渐变角度</label>
                     <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.gradientAngle}°</span>
@@ -3873,7 +3970,7 @@ export default function App() {
               )}
 
               {bgConfig.type === 'image' && (
-                <div className="space-y-2">
+                <div className="space-y-2 pr-10">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">背景图片</label>
                   <input
                     type="file"
@@ -4255,6 +4352,32 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] font-sans selection:bg-emerald-100 selection:text-emerald-900 overflow-hidden">
+      {/* SVG 滤镜 */}
+      <svg style={{ display: 'none' }}>
+        <defs>
+          {/* 像素风图案 (8x8 网格线) */}
+          <pattern id="pixel-art-pattern" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+            <line x1="0" y1="0" x2="8" y2="0" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
+            <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
+          </pattern>
+          {/* 像素风发光渐变 */}
+          <linearGradient id="pixel-glow" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(99,102,241,0.08)" />
+            <stop offset="100%" stopColor="transparent" />
+          </linearGradient>
+        </defs>
+        {/* 颗粒滤镜 (轻量砂纸叠加效果) */}
+        <filter id="sandpaper-filter" x="0%" y="0%" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" result="noise" />
+          <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise" />
+          <feComponentTransfer in="grayNoise" result="lightNoise">
+            <feFuncR type="linear" slope="0.15" />
+            <feFuncG type="linear" slope="0.15" />
+            <feFuncB type="linear" slope="0.15" />
+          </feComponentTransfer>
+          <feBlend in="SourceGraphic" in2="lightNoise" mode="overlay" />
+        </filter>
+      </svg>
       {renderHeader()}
       
       <main
@@ -4352,6 +4475,26 @@ export default function App() {
                     display: 'block',
                   }}
                 />
+                {/* 颗粒纹理覆盖层 */}
+                {bgConfig.texture === 'grain-paper' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'3\' height=\'3\'%3E%3Ccircle cx=\'1\' cy=\'1\' r=\'0.5\' fill=\'rgba(255,255,255,0.06)\'/%3E%3C/svg%3E")',
+                      backgroundSize: '4px 4px',
+                    }}
+                  />
+                )}
+                {/* 像素风纹理覆盖层 */}
+                {bgConfig.texture === 'fine-paper' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'8\' height=\'8\'%3E%3Cline x1=\'0\' y1=\'0\' x2=\'8\' y2=\'0\' stroke=\'rgba(255,255,255,0.06)\' stroke-width=\'1\'/%3E%3Cline x1=\'0\' y1=\'0\' x2=\'0\' y2=\'8\' stroke=\'rgba(255,255,255,0.06)\' stroke-width=\'1\'/%3E%3C/svg%3E")',
+                      backgroundSize: '8px 8px',
+                    }}
+                  />
+                )}
                 {selectedId && (() => {
                   const c = cutouts.find((x) => x.id === selectedId);
                   if (!c) return null;
@@ -4799,6 +4942,19 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #eee; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #ddd; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .pixel-art-grid {
+          background-image: 
+            linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+          background-size: 8px 8px;
+        }
+        .pixel-art-grid::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(to top right, rgba(99,102,241,0.08), transparent);
+          pointer-events: none;
+        }
       `}} />
     </div>
   );
