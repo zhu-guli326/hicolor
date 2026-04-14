@@ -2403,7 +2403,7 @@ export default function App() {
       if (img.height > img.width) {
         setComposition('block-right'); // Portrait -> Horizontal layout
       } else {
-        setComposition('block-bottom'); // Landscape -> Vertical layout
+        setComposition('block-top'); // Landscape -> 色块在上方
       }
       generateAutoCutouts({ imageOverride: img });
       setTimeout(fitToScreen, 100);
