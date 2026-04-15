@@ -125,8 +125,17 @@ interface Cutout {
 }
 
 /** 画布叠字字体预设（已在 index.html 中加载） */
-const TEXT_FONT_PRESETS: { value: string; label: string }[] = [
+const TEXT_FONT_PRESETS: { value: string; label: string; badge?: string }[] = [
+  { value: '"Special Elite", cursive', label: 'Special Elite' },
+  { value: '"Huiwen-mincho", serif', label: '汇文明朝体', badge: '中文推荐' },
   { value: '"Noto Sans SC", sans-serif', label: '黑体' },
+  { value: '"Noto Serif SC", serif', label: '宋体' },
+  { value: '"Ma Shan Zheng", cursive', label: '马善政楷体' },
+  { value: '"ZCOOL XiaoWei", sans-serif', label: '站酷小薇体' },
+  { value: '"ZCOOL QingKe HuangYou", cursive', label: '站酷庆科黄油' },
+  { value: '"Long Cang", cursive', label: '龙藏碑' },
+  { value: '"Liu Jian Mao Cao", cursive', label: '站酷快乐体' },
+  { value: '"Yi Shi Jiti", cursive', label: '意识体' },
   { value: '"Homemade Apple", cursive', label: 'Homemade' },
   { value: '"Cinzel", serif', label: 'Cinzel' },
   { value: '"Oswald", sans-serif', label: 'Oswald' },
@@ -1587,6 +1596,7 @@ export default function App() {
   const [starBrightness, setStarBrightness] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [exportPhase, setExportPhase] = useState<'record' | 'transcode'>('record');
   const [showExportSuccess, setShowExportSuccess] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
@@ -2245,6 +2255,7 @@ export default function App() {
     setExportError(null);
     setIsExporting(true);
     setExportProgress(0);
+    setExportPhase('record');
     setVideoBlobUrl(null);
 
     try {
@@ -2329,59 +2340,77 @@ export default function App() {
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
       recorder.onstop = async () => {
-        const webmBlob = new Blob(chunks, { type: 'video/webm' });
+        // 用 chunks[0].type 动态判断原始录制格式
+        const rawType = chunks.length > 0 ? chunks[0].type : 'video/webm';
+        const webmBlob = new Blob(chunks, { type: rawType });
 
-        if (isMp4) {
-          // 确保 FFmpeg 已加载
-          if (!ffmpegRef.current) {
-            const ffmpeg = new FFmpeg();
-            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-            await ffmpeg.load({
-              coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-              wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-            });
-            ffmpegRef.current = ffmpeg;
-            setFfmpegLoaded(true);
-          }
-          const ffmpeg = ffmpegRef.current;
+        // 确保 FFmpeg 已加载
+        if (!ffmpegRef.current) {
+          setExportError('FFmpeg 未加载，请稍后重试');
+          setIsExporting(false);
+          return;
+        }
+        const ffmpeg = ffmpegRef.current;
+
+        // 更新 UI：进入转码阶段
+        setExportProgress(80);
+        setExportPhase('transcode');
+        setVideoMimeType('video/mp4');
+
+        // 监听 FFmpeg 转码进度
+        ffmpeg.on('progress', ({ progress }) => {
+          // 录制阶段占 80%，转码占剩余 20%
+          setExportProgress(Math.round(80 + progress * 20));
+        });
+
+        try {
+          // 写入 webm 到 FFmpeg 虚拟文件系统
           await ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+
+          // 执行转码：webm → mp4
           await ffmpeg.exec([
-            '-i', 'input.webm', '-c:v', 'libx264', '-preset', 'fast',
-            '-crf', '23', '-c:a', 'aac', '-b:a', '128k', 'output.mp4'
+            '-i', 'input.webm',
+            '-c:v', 'libx264',
+            '-crf', '23',
+            '-preset', 'fast',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',
+            'output.mp4',
           ]);
-          const data = await ffmpeg.readFile('output.mp4');
-          const mp4Blob = new Blob([data], { type: 'video/mp4' });
+
+          // 读取转码后的 mp4
+          const mp4Data = await ffmpeg.readFile('output.mp4');
+          const mp4Blob = new Blob([mp4Data], { type: 'video/mp4' });
+
+          // 清理 FFmpeg 虚拟文件，释放内存
+          await ffmpeg.deleteFile('input.webm');
+          await ffmpeg.deleteFile('output.mp4');
+
+          // 清理旧的 blob URL
+          if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
           const url = URL.createObjectURL(mp4Blob);
           setVideoBlobUrl(url);
-          setVideoMimeType('video/mp4');
-        } else {
+          setExportProgress(100);
+          setIsExporting(false);
+          setShowExportSuccess(true);
+        } catch (err) {
+          console.error('FFmpeg 转码失败:', err);
+          // 转码失败时降级：直接返回 webm
+          if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
           const url = URL.createObjectURL(webmBlob);
           setVideoBlobUrl(url);
           setVideoMimeType('video/webm');
+          setExportProgress(100);
+          setIsExporting(false);
+          setShowExportSuccess(true);
         }
-
-        setIsExporting(false);
-        setShowExportSuccess(true);
       };
 
       recorder.start();
 
-      // 动画参数
-      const DURATION = 3000; // ms
-      const startTime = performance.now();
-
-      let rainfallVal = 0;   // 0→1 (rain / rainfall)
-      let starVal = 0;        // 0→1 (stars)
-      let pulseVal = 0;       // 0→1 (pulse)
-      let batchVal = 0;       // 0→1 (batch)
-
-      const captureFrame = () => {
-        const elapsed = performance.now() - startTime;
-        const t = Math.min(1, elapsed / DURATION);
-        setExportProgress(Math.round(t * 100));
-
-        // 绘制底图
-        ctx.clearRect(0, 0, recW, recH);
+      // 基础层只绘制一次（动画过程中不变）
+      const drawBaseLayer = (ctx: CanvasRenderingContext2D) => {
         if (composition === 'block-right') {
           ctx.drawImage(mainSnap, 0, 0);
           ctx.drawImage(blockSnap, mainW, 0);
@@ -2395,6 +2424,27 @@ export default function App() {
           ctx.drawImage(blockSnap, 0, 0);
           ctx.drawImage(mainSnap, 0, blockH);
         }
+      };
+      drawBaseLayer(ctx);
+
+      // 动画参数
+      const DURATION = 3000; // ms
+      const startTime = performance.now();
+
+      let rainfallVal = 0;
+      let starVal = 0;
+      let pulseVal = 0;
+      let batchVal = 0;
+
+      const captureFrame = () => {
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(1, elapsed / DURATION);
+        // 录制阶段占前 80%，FFmpeg 转码占后 20%
+        setExportProgress(Math.round(t * 80));
+
+        // 只在第一帧绘制底图，后续帧跳过（底图已固定）
+        ctx.clearRect(0, 0, recW, recH);
+        drawBaseLayer(ctx);
 
         // 叠加动画效果（绘制在 recCtx 上，然后合成到 ctx）
         if (activeAnimation !== 'none') {
@@ -3468,17 +3518,6 @@ export default function App() {
 
   const elementOverlayTextPanel = (
     <div className="space-y-4">
-      {/* 第一行：输入文字 */}
-      <textarea
-        value={overlayTextConfig.content}
-        onChange={(e) =>
-          setOverlayTextConfig((prev) => ({ ...prev, content: e.target.value }))
-        }
-        rows={3}
-        className="w-full min-h-[5rem] px-4 py-3 rounded-2xl border border-gray-100 text-sm font-bold text-gray-900 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none bg-white shadow-sm resize-y"
-        placeholder="写一句话…可换行"
-      />
-
       {/* Tab 切换：字体 / 样式 */}
       <div className="flex gap-1 rounded-2xl border border-gray-100 bg-gray-50/90 p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
         <button
@@ -3515,7 +3554,7 @@ export default function App() {
               key={f.value}
               type="button"
               onClick={() => setOverlayTextConfig((prev) => ({ ...prev, fontFamily: f.value }))}
-              className={`px-3 py-2 rounded-xl text-[11px] font-bold border transition-all ${
+              className={`relative px-3 py-2 rounded-xl text-[11px] font-bold border transition-all ${
                 overlayTextConfig.fontFamily === f.value
                   ? 'border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-200/70'
                   : 'bg-white border-gray-100 text-gray-600 hover:border-gray-300'
@@ -3523,6 +3562,11 @@ export default function App() {
               style={{ fontFamily: f.value.replace(/"/g, '') }}
             >
               {f.label}
+              {f.badge && (
+                <span className="absolute -top-2 -right-2 px-1.5 py-0.5 text-[8px] font-black bg-amber-400 text-amber-900 rounded-full shadow-sm">
+                  {f.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -4429,8 +4473,17 @@ export default function App() {
                 )}
 
                 {elementsPanelTab === 'overlay' && (
-                  <div className="pt-2 border-t border-gray-100/90 pr-10 sm:pr-12">
-                    {elementOverlayTextPanel}
+                  <div className="pt-2 border-t border-gray-100/90 pr-10 sm:pr-12 space-y-4">
+                    <textarea
+                      value={overlayTextConfig.content}
+                      onChange={(e) =>
+                        setOverlayTextConfig((prev) => ({ ...prev, content: e.target.value }))
+                      }
+                      rows={3}
+                      className="w-full min-h-[5rem] px-4 py-3 rounded-2xl border border-gray-100 text-sm font-bold text-gray-900 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none bg-white shadow-sm resize-y"
+                      placeholder="写一句话…可换行"
+                    />
+                    {overlayTextConfig.content.trim() && elementOverlayTextPanel}
                   </div>
                 )}
             </motion.div>
@@ -5014,7 +5067,9 @@ export default function App() {
               </div>
               <div>
                 <h3 className="font-black text-xl text-gray-900">正在导出视频...</h3>
-                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">请不要关闭页面</p>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">
+                  {exportPhase === 'transcode' ? '转码中...' : '录制中...'}
+                </p>
               </div>
             </motion.div>
           </motion.div>
@@ -5047,7 +5102,7 @@ export default function App() {
                   onClick={downloadResult}
                   className="w-full bg-emerald-600 text-white py-3 rounded-xl font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-lg"
                 >
-                  下载 MP4
+                  下载 MP4 视频
                 </button>
                 <button
                   onClick={() => setShowExportSuccess(false)}
