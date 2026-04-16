@@ -155,23 +155,7 @@
     "size": "大小",
     "color": "颜色"
   },
-  "elements": {
-    "shape": "形状",
-    "overlay": "叠字",
-    "shapeType": "形状类型",
-    "shapeAdjust": "形状调整",
-    "shapeSize": "大小",
-    "shapeCount": "数量",
-    "shapeVariation": "变化",
-    "shapeColor": "颜色",
-    "shapeDistribution": "分布",
-    "symbolPool": "符号池",
-    "symbolPlaceholder": "输入符号，如 ★♥●",
-    "clearShapes": "清空形状",
-    "cancelShape": "取消形状",
-    "scatterCount": "每槽散落数量"
-  },
-  "overlay": {
+  "text": {
     "text": "文字",
     "font": "字体",
     "style": "样式",

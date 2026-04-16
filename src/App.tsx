@@ -484,7 +484,7 @@ function computeOverlayLineLayout(
  * 在条带画布上绘制叠字（与 blockCanvas 上 x,y 归一化一致）。
  * photoInText：条带区域对应原图裁剪时用 crop；导出整幅色块面时用 stretch-full。
  */
-function drawOverlayTextOnContext(
+async function drawOverlayTextOnContext(
   targetCtx: CanvasRenderingContext2D,
   w: number,
   h: number,
@@ -505,6 +505,15 @@ function drawOverlayTextOnContext(
   if (!overlayTrim || w <= 0 || h <= 0) return;
   const scaleRef = w / 800;
   const basePx = fontSizeUi * scaleRef;
+
+  // 等待字体加载完成后再测量和绘制，防止导出时中文字体乱码
+  try {
+    await Promise.race([
+      document.fonts.ready,
+      new Promise((r) => setTimeout(r, 3000)),
+    ]);
+  } catch {}
+
   const lineLayout = computeOverlayLineLayout(
     targetCtx,
     overlayTrim,
@@ -516,19 +525,17 @@ function drawOverlayTextOnContext(
     oy
   );
 
+  targetCtx.save();
+  targetCtx.font = `800 ${lineLayout.fontSize}px ${fontFamily}, sans-serif`;
+  targetCtx.textAlign = 'center';
+  targetCtx.textBaseline = 'middle';
+  targetCtx.fillStyle = fillColor;
   lineLayout.lines.forEach((line, i) => {
     if (!line) return;
     const y = lineLayout.startY + i * lineLayout.lh;
-    targetCtx.save();
-    targetCtx.font = `800 ${lineLayout.fontSize}px ${fontFamily}, sans-serif`;
-    targetCtx.textAlign = 'center';
-    targetCtx.textBaseline = 'middle';
-    targetCtx.textAlign = 'center';
-    targetCtx.textBaseline = 'middle';
-    targetCtx.fillStyle = fillColor;
     targetCtx.fillText(line, lineLayout.cx, y);
-    targetCtx.restore();
   });
+  targetCtx.restore();
 
   if (!usePhotoFill) return;
 
@@ -3490,7 +3497,7 @@ export default function App() {
 
     const saveOverlayTrim = overlayTextConfig.content.trim();
     if (saveOverlayTrim) {
-      drawOverlayTextOnContext(
+      await drawOverlayTextOnContext(
         bctx,
         iw,
         ih,

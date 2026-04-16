@@ -155,23 +155,7 @@
     "size": "大小",
     "color": "顏色"
   },
-  "elements": {
-    "shape": "形狀",
-    "overlay": "疊字",
-    "shapeType": "形狀類型",
-    "shapeAdjust": "形狀調整",
-    "shapeSize": "大小",
-    "shapeCount": "數量",
-    "shapeVariation": "變化",
-    "shapeColor": "顏色",
-    "shapeDistribution": "分佈",
-    "symbolPool": "符號池",
-    "symbolPlaceholder": "輸入符號，如 ★♥●",
-    "clearShapes": "清空形狀",
-    "cancelShape": "取消形狀",
-    "scatterCount": "每槽散落數量"
-  },
-  "overlay": {
+  "text": {
     "text": "文字",
     "font": "字體",
     "style": "樣式",

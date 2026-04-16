@@ -91,7 +91,19 @@ function getWeekStr(d: Date): string {
 function loadAnalytics(): AnalyticsData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const data = JSON.parse(raw);
+      // 确保所有字段都存在，防止旧数据缺少字段导致类型错误
+      return {
+        hourlyStats: data.hourlyStats || {},
+        weeklyStats: data.weeklyStats || {},
+        newUsersByDate: data.newUsersByDate || {},
+        returnUsersByDate: data.returnUsersByDate || {},
+        featureCombos: data.featureCombos || {},
+        userPaths: data.userPaths || {},
+        deviceStats: data.deviceStats || {},
+      };
+    }
   } catch {}
   return {
     hourlyStats: {},

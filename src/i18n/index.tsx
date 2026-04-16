@@ -54,13 +54,37 @@ const I18nContext = createContext<I18nContextValue>({
 
 const LOCALE_STORAGE_KEY = 'hicolor_locale';
 
+/** 检测浏览器语言并返回匹配的 Locale */
+function detectBrowserLocale(): Locale {
+  if (typeof navigator === 'undefined') return 'zh';
+  
+  const lang = navigator.language || (navigator as unknown as { userLanguage?: string }).userLanguage || 'zh';
+  const langLower = lang.toLowerCase();
+  
+  // 精确匹配
+  if (langLower.startsWith('zh-tw') || langLower.startsWith('zh-hk')) return 'zhTW';
+  if (langLower.startsWith('zh')) return 'zh';
+  if (langLower.startsWith('en')) return 'en';
+  if (langLower.startsWith('ko')) return 'ko';
+  if (langLower.startsWith('ja')) return 'ja';
+  
+  // 部分匹配
+  if (langLower.includes('zh')) return 'zh';
+  if (langLower.includes('en')) return 'en';
+  if (langLower.includes('ko')) return 'ko';
+  if (langLower.includes('ja')) return 'ja';
+  
+  return 'zh';
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     try {
       const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
       if (saved && saved in locales) return saved as Locale;
     } catch {}
-    return 'zh';
+    // 首次访问：从浏览器语言检测
+    return detectBrowserLocale();
   });
 
   const setLocale = useCallback((l: Locale) => {
@@ -77,6 +101,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     let text = getNestedValue(locales[locale], key);
+    // 如果找不到翻译，在控制台显示警告并返回带方括号的 key
+    if (text === undefined || text === key) {
+      console.warn(`[i18n] Missing translation: [${locale}] "${key}"`);
+      return `[${key}]`;
+    }
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));

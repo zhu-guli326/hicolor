@@ -155,23 +155,7 @@
     "size": "크기",
     "color": "색상"
   },
-  "elements": {
-    "shape": "도형",
-    "overlay": "텍스트",
-    "shapeType": "도형 유형",
-    "shapeAdjust": "도형 조정",
-    "shapeSize": "크기",
-    "shapeCount": "개수",
-    "shapeVariation": "변화",
-    "shapeColor": "색상",
-    "shapeDistribution": "분포",
-    "symbolPool": "기호 풀",
-    "symbolPlaceholder": "기호 입력, 예 ★♥●",
-    "clearShapes": "모두 지우기",
-    "cancelShape": "취소",
-    "scatterCount": "분산 개수"
-  },
-  "overlay": {
+  "text": {
     "text": "텍스트",
     "font": "글꼴",
     "style": "스타일",

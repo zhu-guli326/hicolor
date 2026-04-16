@@ -155,23 +155,7 @@
     "size": "サイズ",
     "color": "色"
   },
-  "elements": {
-    "shape": "シェイプ",
-    "overlay": "テキスト",
-    "shapeType": "シェイプタイプ",
-    "shapeAdjust": "シェイプ調整",
-    "shapeSize": "サイズ",
-    "shapeCount": "数量",
-    "shapeVariation": "変化",
-    "shapeColor": "色",
-    "shapeDistribution": "分布",
-    "symbolPool": "記号プール",
-    "symbolPlaceholder": "記号を入力、例 ★♥●",
-    "clearShapes": "すべてクリア",
-    "cancelShape": "キャンセル",
-    "scatterCount": "散布数量"
-  },
-  "overlay": {
+  "text": {
     "text": "テキスト",
     "font": "フォント",
     "style": "スタイル",
