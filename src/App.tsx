@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toPng } from 'html-to-image';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { useStats } from './hooks/useStats';
 import {
   Upload,
   RefreshCw,
@@ -46,12 +47,14 @@ import {
   ChevronRight,
   Layers,
   Loader2,
+  BarChart3,
+  RotateCcw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 // --- Types & Constants ---
 
-type BottomNavTab = 'background' | 'elements' | 'video';
+type BottomNavTab = 'background' | 'elements' | 'video' | 'stats';
 
 type AnimationType = 'pulse' | 'batch' | 'rain' | 'stars' | 'none';
 
@@ -1566,6 +1569,25 @@ function TemplateButton({ label, icon, active, onClick, onDeselect }: { label: s
 }
 
 export default function App() {
+  // --- Stats ---
+  const { stats, track, resetStats } = useStats();
+  const lastBgTypeRef = useRef<string | null>(null);
+  const lastCompositionRef = useRef<string | null>(null);
+  const lastShapeKindRef = useRef<string | null>(null);
+  const lastDistributionModeRef = useRef<string | null>(null);
+  const lastCreationModeRef = useRef<string | null>(null);
+  const lastAnimationRef = useRef<string | null>(null);
+  const lastTextureRef = useRef<string | null>(null);
+  const lastBgColor1Ref = useRef<string | null>(null);
+  const lastBgColor2Ref = useRef<string | null>(null);
+  const lastShapeColorRef = useRef<string | null>(null);
+  const lastGradientAngleRef = useRef<number | null>(null);
+  const lastBaseSizeRef = useRef<number | null>(null);
+  const lastVariationRef = useRef<number | null>(null);
+  const lastAutoCountRef = useRef<number | null>(null);
+  const lastScatterCountRef = useRef<number | null>(null);
+  const lastSeedRef = useRef<number | null>(null);
+
   // --- State ---
   const [activeTab, setActiveTab] = useState<BottomNavTab | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -1912,6 +1934,98 @@ export default function App() {
     scatterCount: 3,
   });
 
+  // --- Stats Tracking: 跟踪配置变化（仅在值真正改变时记录） ---
+  useEffect(() => {
+    if (lastBgTypeRef.current !== null && lastBgTypeRef.current !== bgConfig.type) {
+      track({ type: 'change_bg_type', bgType: bgConfig.type });
+    }
+    lastBgTypeRef.current = bgConfig.type;
+  }, [bgConfig.type]);
+
+  useEffect(() => {
+    if (lastCompositionRef.current !== null && lastCompositionRef.current !== composition) {
+      track({ type: 'change_composition', composition });
+    }
+    lastCompositionRef.current = composition;
+  }, [composition]);
+
+  useEffect(() => {
+    if (lastShapeKindRef.current !== null && lastShapeKindRef.current !== cutoutConfig.defaultShapeKind) {
+      track({ type: 'change_shape_kind', shapeKind: cutoutConfig.defaultShapeKind });
+    }
+    lastShapeKindRef.current = cutoutConfig.defaultShapeKind;
+  }, [cutoutConfig.defaultShapeKind]);
+
+  useEffect(() => {
+    if (lastDistributionModeRef.current !== null && lastDistributionModeRef.current !== cutoutConfig.distributionMode) {
+      track({ type: 'change_distribution_mode', mode: cutoutConfig.distributionMode });
+    }
+    lastDistributionModeRef.current = cutoutConfig.distributionMode;
+  }, [cutoutConfig.distributionMode]);
+
+  useEffect(() => {
+    if (lastCreationModeRef.current !== null && lastCreationModeRef.current !== cutoutConfig.creationMode) {
+      track({ type: 'change_creation_mode', mode: cutoutConfig.creationMode });
+    }
+    lastCreationModeRef.current = cutoutConfig.creationMode;
+  }, [cutoutConfig.creationMode]);
+
+  useEffect(() => {
+    if (lastAnimationRef.current !== null && lastAnimationRef.current !== activeAnimation) {
+      track({ type: 'change_animation', animation: activeAnimation });
+    }
+    lastAnimationRef.current = activeAnimation;
+  }, [activeAnimation]);
+
+  useEffect(() => {
+    if (lastTextureRef.current !== null && lastTextureRef.current !== bgConfig.texture) {
+      track({ type: 'change_texture', textureType: bgConfig.texture });
+    }
+    lastTextureRef.current = bgConfig.texture;
+  }, [bgConfig.texture]);
+
+  useEffect(() => {
+    if (lastBgColor1Ref.current !== null && lastBgColor1Ref.current !== bgConfig.color1) {
+      track({ type: 'change_bg_color', color: bgConfig.color1, index: 1 });
+    }
+    lastBgColor1Ref.current = bgConfig.color1;
+  }, [bgConfig.color1]);
+
+  useEffect(() => {
+    if (lastBgColor2Ref.current !== null && lastBgColor2Ref.current !== bgConfig.color2) {
+      track({ type: 'change_bg_color', color: bgConfig.color2, index: 2 });
+    }
+    lastBgColor2Ref.current = bgConfig.color2;
+  }, [bgConfig.color2]);
+
+  useEffect(() => {
+    if (lastShapeColorRef.current !== null && lastShapeColorRef.current !== cutoutConfig.shapeColor) {
+      track({ type: 'change_shape_color', color: cutoutConfig.shapeColor });
+    }
+    lastShapeColorRef.current = cutoutConfig.shapeColor;
+  }, [cutoutConfig.shapeColor]);
+
+  useEffect(() => {
+    if (lastBaseSizeRef.current !== null && lastBaseSizeRef.current !== cutoutConfig.baseSize) {
+      track({ type: 'change_shape_size', size: cutoutConfig.baseSize });
+    }
+    lastBaseSizeRef.current = cutoutConfig.baseSize;
+  }, [cutoutConfig.baseSize]);
+
+  useEffect(() => {
+    if (lastAutoCountRef.current !== null && lastAutoCountRef.current !== cutoutConfig.autoCount) {
+      track({ type: 'change_shape_count', count: cutoutConfig.autoCount });
+    }
+    lastAutoCountRef.current = cutoutConfig.autoCount;
+  }, [cutoutConfig.autoCount]);
+
+  useEffect(() => {
+    if (lastVariationRef.current !== null && lastVariationRef.current !== cutoutConfig.variation) {
+      track({ type: 'change_creation_mode', mode: `variation_${cutoutConfig.variation}` });
+    }
+    lastVariationRef.current = cutoutConfig.variation;
+  }, [cutoutConfig.variation]);
+
   const [overlayTextConfig, setOverlayTextConfig] = useState({
     content: '',
     fontSize: 35,
@@ -1959,6 +2073,11 @@ export default function App() {
     (opts?: { defaultShapeKind?: ShapeKind; autoCount?: number; imageOverride?: HTMLImageElement }) => {
     const img = opts?.imageOverride ?? image;
     if (!img) return;
+
+    // 仅在手动触发（无 imageOverride）时记录统计
+    if (!opts?.imageOverride) {
+      track({ type: 'generate_cutouts' });
+    }
     const { autoCount, baseSize, variation } = cutoutConfig;
     const count = Math.max(1, Math.round(opts?.autoCount ?? autoCount));
     const dkForGen = opts?.defaultShapeKind ?? cutoutConfig.defaultShapeKind;
@@ -2195,6 +2314,7 @@ export default function App() {
 
   const handleAnimationSelect = (type: AnimationType) => {
     setActiveAnimation(type);
+    track({ type: 'play_animation' });
     setIsPlaying(true);
     
     if (type === 'stars') {
@@ -2394,6 +2514,7 @@ export default function App() {
           setExportProgress(100);
           setIsExporting(false);
           setShowExportSuccess(true);
+          track({ type: 'export_video' });
         } catch (err) {
           console.error('FFmpeg 转码失败:', err);
           // 转码失败时降级：直接返回 webm
@@ -2404,6 +2525,7 @@ export default function App() {
           setExportProgress(100);
           setIsExporting(false);
           setShowExportSuccess(true);
+          track({ type: 'export_video' });
         }
       };
 
@@ -2613,6 +2735,7 @@ export default function App() {
         setComposition('block-top'); // Landscape -> 色块在上方
       }
       generateAutoCutouts({ imageOverride: img });
+      track({ type: 'upload_image' });
       setTimeout(fitToScreen, 100);
       fileInput.value = '';
     };
@@ -3402,6 +3525,8 @@ export default function App() {
     });
     if (!blob) return;
 
+    track({ type: 'export_png' });
+
     // 1) Web Share + 文件：移动端保存到相册/微信最可靠（async 仍常保留用户激活）
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
@@ -3796,6 +3921,7 @@ export default function App() {
         <button
           type="button"
           onClick={() => {
+            track({ type: 'clear_cutouts' });
             setCutouts([]);
             setSelectedId(null);
           }}
@@ -3818,6 +3944,211 @@ export default function App() {
   );
 
   // --- Render Helpers ---
+
+  // 渲染趋势柱状图（7天活跃趋势）
+  const renderTrendChart = () => {
+    const dailyStats = stats.dailyStats || [];
+    const today = new Date();
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
+    });
+
+    const dayLabels = ['日', '一', '二', '三', '四', '五', '六'];
+    const data = days.map(day => {
+      const found = dailyStats.find(d => d.date === day);
+      return found ? found.actionsCount : 0;
+    });
+
+    const maxVal = Math.max(...data, 1);
+
+    return (
+      <div className="space-y-2">
+        <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">7天活跃趋势</h4>
+        <div className="flex items-end justify-between gap-1 h-16 px-1">
+          {days.map((day, i) => {
+            const val = data[i];
+            const height = Math.max((val / maxVal) * 100, 2);
+            const date = new Date(day);
+            const weekday = dayLabels[date.getDay()];
+            const isToday = day === today.toISOString().split('T')[0];
+            return (
+              <div key={day} className="flex flex-col items-center gap-1 flex-1">
+                <div className="w-full flex flex-col items-center justify-end h-10">
+                  {val > 0 && (
+                    <span className="text-[7px] font-mono font-bold text-emerald-600 mb-0.5">{val}</span>
+                  )}
+                  <div
+                    className={`w-full rounded-t transition-all duration-500 ${
+                      isToday ? 'bg-emerald-500' : 'bg-emerald-200'
+                    }`}
+                    style={{ height: `${height}%` }}
+                  />
+                </div>
+                <span className={`text-[7px] font-bold ${isToday ? 'text-emerald-600' : 'text-gray-400'}`}>
+                  {weekday}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // 渲染环形进度图
+  const renderCircleProgress = (value: number, max: number, label: string, color: string = 'emerald') => {
+    const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+    const radius = 18;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (pct / 100) * circumference;
+
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <div className="relative w-12 h-12">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 44 44">
+            <circle
+              cx="22" cy="22" r={radius}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              className="text-gray-100"
+            />
+            <circle
+              cx="22" cy="22" r={radius}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              className={`text-${color}-500 transition-all duration-700`}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[10px] font-black text-gray-700">{Math.round(pct)}%</span>
+          </div>
+        </div>
+        <span className="text-[7px] font-bold text-gray-400 text-center">{label}</span>
+      </div>
+    );
+  };
+
+  // 渲染统计数据条形图
+  const renderStatBar = (usageKey: keyof typeof stats, labelMap?: Record<string, string>, maxItems: number = 5) => {
+    const usage = stats[usageKey] as Record<string, number>;
+    if (!usage || Object.keys(usage).length === 0) {
+      return <p className="text-[9px] text-gray-400 italic">暂无数据</p>;
+    }
+    const entries = Object.entries(usage)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, maxItems);
+    const maxVal = entries[0]?.[1] || 1;
+
+    return (
+      <div className="space-y-1.5">
+        {entries.map(([key, count]) => {
+          const label = labelMap?.[key] ?? key;
+          const pct = Math.round((count / maxVal) * 100);
+          return (
+            <div key={key} className="flex items-center gap-2">
+              <span className="text-[8px] font-bold text-gray-500 w-14 shrink-0 text-right truncate">{label}</span>
+              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="text-[8px] font-mono font-bold text-gray-400 w-4 text-right">{count}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // 渲染颜色使用热力条
+  const renderColorBar = (usage: Record<string, number>, maxItems: number = 8) => {
+    if (!usage || Object.keys(usage).length === 0) {
+      return <p className="text-[9px] text-gray-400 italic">暂无数据</p>;
+    }
+    const entries = Object.entries(usage)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, maxItems);
+    const maxVal = entries[0]?.[1] || 1;
+
+    return (
+      <div className="space-y-1.5">
+        {entries.map(([color, count]) => {
+          const pct = Math.round((count / maxVal) * 100);
+          const isHex = /^#[0-9A-Fa-f]{6}$/.test(color);
+          return (
+            <div key={color} className="flex items-center gap-2">
+              {isHex ? (
+                <div
+                  className="w-4 h-4 rounded border border-gray-200 shrink-0"
+                  style={{ backgroundColor: color }}
+                />
+              ) : (
+                <div className="w-4 h-4 rounded border border-gray-200 bg-gray-200 shrink-0" />
+              )}
+              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%`, backgroundColor: isHex ? color : '#10b981' }}
+                />
+              </div>
+              <span className="text-[8px] font-mono font-bold text-gray-400 w-4 text-right">{count}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // 渲染行为漏斗
+  const renderFunnel = () => {
+    const uploads = stats.totalUploads;
+    const exports = stats.totalExports + stats.totalVideoExports;
+    const views = stats.visitCount;
+
+    const funnelData = [
+      { label: '访问', value: views, color: 'bg-blue-400' },
+      { label: '上传', value: uploads, color: 'bg-emerald-400' },
+      { label: '导出', value: exports, color: 'bg-purple-400' },
+    ];
+
+    const maxVal = views || 1;
+
+    return (
+      <div className="space-y-2">
+        <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">行为漏斗</h4>
+        <div className="space-y-1.5">
+          {funnelData.map((item, i) => {
+            const width = Math.max((item.value / maxVal) * 100, 5);
+            const pct = maxVal > 0 ? Math.round((item.value / maxVal) * 100) : 0;
+            return (
+              <div key={item.label} className="flex items-center gap-2">
+                <span className="text-[8px] font-bold text-gray-500 w-6 shrink-0">{item.label}</span>
+                <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
+                  <div
+                    className={`h-full ${item.color} rounded transition-all duration-500 flex items-center justify-end pr-1`}
+                    style={{ width: `${width}%` }}
+                  >
+                    {width > 20 && (
+                      <span className="text-[7px] font-bold text-white">{item.value}</span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[8px] font-mono font-bold text-gray-400 w-8 text-right">{pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   const renderTabButton = (id: BottomNavTab, icon: React.ReactNode, label: string) => (
     <button
@@ -3879,6 +4210,7 @@ export default function App() {
       <div className="flex justify-around items-center h-14 px-4">
         {renderTabButton('background', <Palette size={22} />, '背景')}
         {renderTabButton('elements', <Target size={22} />, '元素')}
+        {renderTabButton('stats', <BarChart3 size={22} />, '统计')}
         {renderTabButton('video', <Video size={22} />, '视频')}
       </div>
     </nav>
@@ -4489,6 +4821,201 @@ export default function App() {
             </motion.div>
           )}
 
+          {activeTab === 'stats' && (
+            <motion.div
+              key="stats"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-5"
+            >
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">数据分析</h3>
+
+              {/* 概览卡片 - 核心指标 */}
+              <div className="grid grid-cols-4 gap-2">
+                <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
+                  <div className="text-lg font-black text-emerald-600">{stats.visitCount}</div>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">访问</div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
+                  <div className="text-lg font-black text-emerald-600">{stats.totalUploads}</div>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">上传</div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
+                  <div className="text-lg font-black text-emerald-600">{stats.totalExports}</div>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">导出</div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
+                  <div className="text-lg font-black text-emerald-600">{stats.totalActions}</div>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">操作</div>
+                </div>
+              </div>
+
+              {/* 连续活跃 & 会话信息 */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2 text-center">
+                  <div className="text-lg font-black text-emerald-600">{stats.currentStreak}</div>
+                  <div className="text-[7px] font-bold text-emerald-500">连续天数</div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
+                  <div className="text-lg font-black text-gray-900">{stats.sessionCount}</div>
+                  <div className="text-[7px] font-bold text-gray-400">会话数</div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
+                  <div className="text-lg font-black text-gray-900">{stats.avgSessionMinutes || 0}<span className="text-[10px]">m</span></div>
+                  <div className="text-[7px] font-bold text-gray-400">均会话</div>
+                </div>
+              </div>
+
+              {/* 7天活跃趋势图 */}
+              {renderTrendChart()}
+
+              {/* 行为漏斗 */}
+              {renderFunnel()}
+
+              {/* 效率指标 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">效率指标</h4>
+                <div className="flex justify-around items-center bg-gray-50/50 rounded-xl border border-gray-100 p-3">
+                  {renderCircleProgress(stats.uploadSuccessRate, 100, '上传成功率', 'emerald')}
+                  {renderCircleProgress(stats.exportSuccessRate, 100, '导出成功率', 'blue')}
+                  {renderCircleProgress(
+                    stats.totalExports > 0 ? (stats.totalUploads / stats.totalExports) : 0,
+                    Math.max(stats.totalUploads, 1),
+                    '创作产出比',
+                    'purple'
+                  )}
+                </div>
+              </div>
+
+              {/* 最热功能标签 */}
+              {stats.mostUsedFeature && stats.featureCounts[stats.mostUsedFeature] > 0 && (
+                <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3">
+                  <div className="text-[8px] font-bold text-amber-600 uppercase tracking-wider mb-1">🏆 最常用功能</div>
+                  <div className="text-sm font-black text-amber-700">
+                    {stats.mostUsedFeature.replace(/_/g, ' ')}
+                  </div>
+                  <div className="text-[9px] text-amber-500 mt-0.5">
+                    已使用 {stats.featureCounts[stats.mostUsedFeature]} 次
+                  </div>
+                </div>
+              )}
+
+              {stats.lastVisit && (
+                <p className="text-[9px] text-gray-400 font-bold text-center">
+                  最后访问：{stats.lastVisit}
+                </p>
+              )}
+
+              {/* 功能热度排名 - 底图类型 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">底图类型 · 使用排行</h4>
+                {renderStatBar('bgTypeUsage', {
+                  solid: '纯色', split: '双拼色', gradient: '渐变', image: '图片',
+                  grid: '笔记本', diagonal: '格子', block: '棋盘格', dots: '点阵',
+                })}
+              </div>
+
+              {/* 底图颜色使用热力图 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">底图颜色 · 热门色系</h4>
+                {renderColorBar(stats.bgColorUsage)}
+              </div>
+
+              {/* 形状类型使用排行 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">形状类型 · 使用排行</h4>
+                {renderStatBar('shapeKindUsage', {
+                  circle: '圆形', square: '方形', star: '星形', drop: '水滴',
+                  snowflake: '雪花', heart: '爱心', symbol: '符号', randomLetters: '随机字母',
+                })}
+              </div>
+
+              {/* 形状颜色使用热力图 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">形状颜色 · 热门色系</h4>
+                {renderColorBar(stats.shapeColorUsage)}
+              </div>
+
+              {/* 动画模板使用排行 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">动画模板 · 使用排行</h4>
+                {renderStatBar('animationUsage', {
+                  pulse: '形状叠加', batch: '形状切换', rain: '漫步雨季',
+                  stars: '璀璨星河', rainfall: '慢步雨季',
+                })}
+              </div>
+
+              {/* 排版模式使用排行 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">排版模式 · 使用排行</h4>
+                {renderStatBar('compositionUsage', {
+                  'block-bottom': '色块在下', 'block-top': '色块在上',
+                  'block-left': '色块在左', 'block-right': '色块在右',
+                })}
+              </div>
+
+              {/* 分布模式使用排行 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">分布模式 · 使用排行</h4>
+                {renderStatBar('distributionModeUsage', {
+                  scatter: '分散', gather: '聚集', edge: '边缘',
+                })}
+              </div>
+
+              {/* 纹理类型使用排行 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">纹理效果 · 使用排行</h4>
+                {renderStatBar('textureUsage', {
+                  'none': '无纹理', 'fine-paper': '细腻纸张', 'fine-noise': '细腻噪点',
+                  'grain-paper': '颗粒纸张', 'coarse-paper': '粗砂纸',
+                })}
+              </div>
+
+              {/* 渐变类型使用排行 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">渐变类型 · 使用排行</h4>
+                {renderStatBar('gradientUsage', {
+                  linear: '线性', radial: '径向', conic: '圆锥',
+                })}
+              </div>
+
+              {/* 每日统计数据 */}
+              {stats.dailyStats && stats.dailyStats.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">最近活跃</h4>
+                  <div className="space-y-1">
+                    {stats.dailyStats.slice(-5).reverse().map((day: any) => (
+                      <div key={day.date} className="flex items-center justify-between text-[8px] text-gray-500 bg-gray-50/50 rounded px-2 py-1">
+                        <span>{day.date}</span>
+                        <div className="flex gap-4">
+                          <span>访问<span className="font-bold text-emerald-600 ml-1">{day.visitCount}</span></span>
+                          <span>上传<span className="font-bold text-blue-600 ml-1">{day.uploads}</span></span>
+                          <span>导出<span className="font-bold text-purple-600 ml-1">{day.exports}</span></span>
+                          <span>操作<span className="font-bold text-gray-700 ml-1">{day.actionsCount}</span></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 重置按钮 */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('确定要清除所有统计数据吗？此操作不可恢复。')) {
+                    resetStats();
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-gray-200 text-gray-400 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-50 hover:text-gray-600 transition-all"
+              >
+                <RotateCcw size={12} />
+                <span>清除统计数据</span>
+              </button>
+            </motion.div>
+          )}
+
           {activeTab === 'video' && (
             <motion.div
               key="video"
@@ -4506,28 +5033,28 @@ export default function App() {
                   icon={<Maximize className="w-4 h-4" />} 
                   active={activeAnimation === 'pulse'}
                   onClick={() => handleAnimationSelect('pulse')}
-                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); }}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); track({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton 
                   label="形状切换" 
                   icon={<Layers size={4} className="w-4 h-4" />} 
                   active={activeAnimation === 'batch'}
                   onClick={() => handleAnimationSelect('batch')}
-                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); }}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); track({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton 
                   label="漫步雨季" 
                   icon={<CloudRain className="w-4 h-4" />} 
                   active={activeAnimation === 'rain'}
                   onClick={() => handleAnimationSelect('rain')}
-                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); }}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); track({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton
                   label="璀璨星河"
                   icon={<Star className="w-4 h-4" />}
                   active={activeAnimation === 'stars'}
                   onClick={() => handleAnimationSelect('stars')}
-                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); }}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); track({ type: 'stop_animation' }); }}
                 />
                 <div className="relative">
                   <button
@@ -4895,7 +5422,7 @@ export default function App() {
                 {activeAnimation !== 'none' && !isPlaying && image && (
                   <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
                     <button
-                      onClick={() => setIsPlaying(true)}
+                      onClick={() => { setIsPlaying(true); track({ type: 'play_animation' }); }}
                       className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
                     >
                       <Play className="text-emerald-600 w-6 h-6 fill-emerald-600 ml-1" />
