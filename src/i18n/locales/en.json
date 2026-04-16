@@ -1,0 +1,160 @@
+{
+  "app": {
+    "title": "HiColor",
+    "subtitle": "AI-Powered Background Animation Generator"
+  },
+  "nav": {
+    "background": "Background",
+    "elements": "Elements",
+    "video": "Video",
+    "stats": "Stats",
+    "language": "Language"
+  },
+  "stats": {
+    "title": "Data Analysis",
+    "visits": "Visits",
+    "uploads": "Uploads",
+    "exports": "Exports",
+    "operations": "Actions",
+    "consecutiveDays": "Consecutive Days",
+    "sessions": "Sessions",
+    "avgSession": "Avg Session",
+    "noData": "No data yet",
+    "resetConfirm": "Are you sure you want to clear all stats? This cannot be undone.",
+    "clearStats": "Clear Statistics",
+    "lastVisit": "Last visit",
+    "mostUsedFeature": "Most Used Feature",
+    "usedTimes": "Used {count} times"
+  },
+  "bgTypes": {
+    "solid": "Solid",
+    "split": "Split",
+    "gradient": "Gradient",
+    "image": "Image",
+    "grid": "Notebook",
+    "diagonal": "Grid",
+    "block": "Checkerboard",
+    "dots": "Dots"
+  },
+  "shapeKinds": {
+    "circle": "Circle",
+    "square": "Square",
+    "star": "Star",
+    "drop": "Drop",
+    "snowflake": "Snowflake",
+    "heart": "Heart",
+    "symbol": "Symbol",
+    "randomLetters": "Random Letters"
+  },
+  "animations": {
+    "pulse": "Pulse",
+    "batch": "Batch",
+    "rain": "Rainy Walk",
+    "stars": "Starry Sky",
+    "rainfall": "Slow Rain"
+  },
+  "compositions": {
+    "block-bottom": "Block Bottom",
+    "block-top": "Block Top",
+    "block-left": "Block Left",
+    "block-right": "Block Right"
+  },
+  "distributions": {
+    "scatter": "Scatter",
+    "gather": "Gather",
+    "edge": "Edge"
+  },
+  "textures": {
+    "none": "None",
+    "fine-paper": "Fine Paper",
+    "fine-noise": "Fine Noise",
+    "grain-paper": "Grain Paper",
+    "coarse-paper": "Coarse Paper"
+  },
+  "gradients": {
+    "linear": "Linear",
+    "radial": "Radial",
+    "conic": "Conic"
+  },
+  "sections": {
+    "bgTypeRanking": "Background Type · Usage",
+    "bgColorHot": "Background Color · Hot Colors",
+    "shapeRanking": "Shape Type · Usage",
+    "shapeColorHot": "Shape Color · Hot Colors",
+    "animationRanking": "Animation Template · Usage",
+    "compositionRanking": "Composition · Usage",
+    "distributionRanking": "Distribution · Usage",
+    "textureRanking": "Texture · Usage",
+    "gradientRanking": "Gradient Type · Usage",
+    "recentActivity": "Recent Activity",
+    "efficiency": "Efficiency Metrics",
+    "uploadRate": "Upload Success",
+    "exportRate": "Export Success",
+    "creationRate": "Creation Output",
+    "trendChart": "7-Day Activity Trend",
+    "funnel": "Behavior Funnel",
+    "hourlyAnalysis": "Hourly Analysis",
+    "weekComparison": "Week Comparison",
+    "retentionRate": "Retention Rate",
+    "topFeatures": "Top Features TOP5",
+    "deviceStats": "Device Distribution",
+    "dailyInsight": "Daily Insight"
+  },
+  "upload": {
+    "title": "Upload Image",
+    "dragHint": "Drag or click to upload",
+    "dropHint": "Release to upload",
+    "processing": "AI processing...",
+    "success": "Upload success",
+    "failed": "Upload failed"
+  },
+  "export": {
+    "png": "Export PNG",
+    "video": "Export Video",
+    "generating": "Generating...",
+    "download": "Download"
+  },
+  "text": {
+    "addText": "Add Text",
+    "placeholder": "Enter text...",
+    "font": "Font",
+    "size": "Size",
+    "color": "Color"
+  },
+  "errors": {
+    "uploadFailed": "Upload failed, please retry",
+    "exportFailed": "Export failed, please retry",
+    "apiKeyMissing": "API Key not configured",
+    "networkError": "Network error"
+  },
+  "languages": {
+    "zh": "简体中文",
+    "zhTW": "繁體中文",
+    "en": "English",
+    "ko": "한국어",
+    "ja": "日本語"
+  },
+  "chart": {
+    "views": "Views",
+    "upload": "Upload",
+    "export": "Export",
+    "actions": "Actions",
+    "thisWeek": "This Week",
+    "lastWeek": "Last Week",
+    "day": "Day",
+    "hour": "Hour",
+    "visitors": "Visitors",
+    "newUsers": "New",
+    "returnees": "Returning",
+    "funnelViews": "Views",
+    "funnelUpload": "Upload",
+    "funnelExport": "Export",
+    "funnelShare": "Share"
+  },
+  "insights": {
+    "peakHour": "Peak Hour",
+    "mostProductiveDay": "Most Active Day",
+    "topCombination": "Top Combination",
+    "exportRatio": "Export Ratio"
+  }
+}

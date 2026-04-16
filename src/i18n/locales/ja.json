@@ -1,0 +1,160 @@
+{
+  "app": {
+    "title": "HiColor",
+    "subtitle": "AI背景アニメーション生成ツール"
+  },
+  "nav": {
+    "background": "背景",
+    "elements": "要素",
+    "video": "動画",
+    "stats": "データ",
+    "language": "言語"
+  },
+  "stats": {
+    "title": "データ分析",
+    "visits": "訪問",
+    "uploads": "アップロード",
+    "exports": "エクスポート",
+    "operations": "操作",
+    "consecutiveDays": "連続日数",
+    "sessions": "セッション数",
+    "avgSession": "平均セッション",
+    "noData": "データなし",
+    "resetConfirm": "すべての統計を削除してもよろしいですか？この操作は取り消せません。",
+    "clearStats": "統計を削除",
+    "lastVisit": "最終訪問",
+    "mostUsedFeature": "最も使用された機能",
+    "usedTimes": "{count}回使用"
+  },
+  "bgTypes": {
+    "solid": "単色",
+    "split": "分割",
+    "gradient": "グラデーション",
+    "image": "画像",
+    "grid": "ノート",
+    "diagonal": "グリッド",
+    "block": "チェッカーボード",
+    "dots": "ドット"
+  },
+  "shapeKinds": {
+    "circle": "円形",
+    "square": "四角形",
+    "star": "星",
+    "drop": "水滴",
+    "snowflake": "雪の結晶",
+    "heart": "ハート",
+    "symbol": "記号",
+    "randomLetters": "ランダム文字"
+  },
+  "animations": {
+    "pulse": "パルス",
+    "batch": "バッチ",
+    "rain": "雨の中散歩",
+    "stars": "輝く星空",
+    "rainfall": "穏やかな雨"
+  },
+  "compositions": {
+    "block-bottom": "ブロック下",
+    "block-top": "ブロック上",
+    "block-left": "ブロック左",
+    "block-right": "ブロック右"
+  },
+  "distributions": {
+    "scatter": "分散",
+    "gather": "集結",
+    "edge": "エッジ"
+  },
+  "textures": {
+    "none": "テクスチャなし",
+    "fine-paper": "繊細紙",
+    "fine-noise": "繊細ノイズ",
+    "grain-paper": "粒状紙",
+    "coarse-paper": "粗い紙"
+  },
+  "gradients": {
+    "linear": "線形",
+    "radial": "放射",
+    "conic": "円錐"
+  },
+  "sections": {
+    "bgTypeRanking": "背景タイプ · ランキング",
+    "bgColorHot": "背景色 · 人気色",
+    "shapeRanking": "シェイプタイプ · ランキング",
+    "shapeColorHot": "シェイプ色 · 人気色",
+    "animationRanking": "アニメーション · ランキング",
+    "compositionRanking": "構成モード · ランキング",
+    "distributionRanking": "分布モード · ランキング",
+    "textureRanking": "テクスチャ効果 · ランキング",
+    "gradientRanking": "グラデーションタイプ · ランキング",
+    "recentActivity": "最近のアクティビティ",
+    "efficiency": "効率指標",
+    "uploadRate": "アップロード成功率",
+    "exportRate": "エクスポート成功率",
+    "creationRate": "創作产出率",
+    "trendChart": "7日間アクティビティトレンド",
+    "funnel": "行動ファネル",
+    "hourlyAnalysis": "時間帯分析",
+    "weekComparison": "週間比較",
+    "retentionRate": "Retention率",
+    "topFeatures": "人気機能 TOP5",
+    "deviceStats": "デバイス分布",
+    "dailyInsight": "デイリーインサイト"
+  },
+  "upload": {
+    "title": "画像をアップロード",
+    "dragHint": "ドラッグまたはクリックしてアップロード",
+    "dropHint": "離してアップロード",
+    "processing": "AI処理中...",
+    "success": "アップロード成功",
+    "failed": "アップロード失敗"
+  },
+  "export": {
+    "png": "PNGエクスポート",
+    "video": "動画エクスポート",
+    "generating": "生成中...",
+    "download": "ダウンロード"
+  },
+  "text": {
+    "addText": "テキストを追加",
+    "placeholder": "テキストを入力...",
+    "font": "フォント",
+    "size": "サイズ",
+    "color": "色"
+  },
+  "errors": {
+    "uploadFailed": "アップロード失敗、再試行してください",
+    "exportFailed": "エクスポート失敗、再試行してください",
+    "apiKeyMissing": "API Keyが設定されていません",
+    "networkError": "ネットワークエラー"
+  },
+  "languages": {
+    "zh": "简体中文",
+    "zhTW": "繁體中文",
+    "en": "English",
+    "ko": "한국어",
+    "ja": "日本語"
+  },
+  "chart": {
+    "views": "訪問",
+    "upload": "アップロード",
+    "export": "エクスポート",
+    "actions": "操作",
+    "thisWeek": "今週",
+    "lastWeek": "先週",
+    "day": "日",
+    "hour": "時",
+    "visitors": "訪問者",
+    "newUsers": "新規",
+    "returnees": "再訪",
+    "funnelViews": "訪問",
+    "funnelUpload": "アップロード",
+    "funnelExport": "エクスポート",
+    "funnelShare": "シェア"
+  },
+  "insights": {
+    "peakHour": "ピーク時間帯",
+    "mostProductiveDay": "最も活発な日",
+    "topCombination": "人気組み合わせ",
+    "exportRatio": "エクスポート比率"
+  }
+}

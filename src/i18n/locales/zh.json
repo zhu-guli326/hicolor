@@ -1,0 +1,160 @@
+{
+  "app": {
+    "title": "HiColor",
+    "subtitle": "AI 智能背景动画生成器"
+  },
+  "nav": {
+    "background": "背景",
+    "elements": "元素",
+    "video": "视频",
+    "stats": "数据",
+    "language": "语言"
+  },
+  "stats": {
+    "title": "数据分析",
+    "visits": "访问",
+    "uploads": "上传",
+    "exports": "导出",
+    "operations": "操作",
+    "consecutiveDays": "连续天数",
+    "sessions": "会话数",
+    "avgSession": "均会话",
+    "noData": "暂无数据",
+    "resetConfirm": "确定要清除所有统计数据吗？此操作不可恢复。",
+    "clearStats": "清除统计数据",
+    "lastVisit": "最后访问",
+    "mostUsedFeature": "最常用功能",
+    "usedTimes": "已使用 {count} 次"
+  },
+  "bgTypes": {
+    "solid": "纯色",
+    "split": "双拼色",
+    "gradient": "渐变",
+    "image": "图片",
+    "grid": "笔记本",
+    "diagonal": "格子",
+    "block": "棋盘格",
+    "dots": "点阵"
+  },
+  "shapeKinds": {
+    "circle": "圆形",
+    "square": "方形",
+    "star": "星形",
+    "drop": "水滴",
+    "snowflake": "雪花",
+    "heart": "爱心",
+    "symbol": "符号",
+    "randomLetters": "随机字母"
+  },
+  "animations": {
+    "pulse": "形状叠加",
+    "batch": "形状切换",
+    "rain": "漫步雨季",
+    "stars": "璀璨星河",
+    "rainfall": "慢步雨季"
+  },
+  "compositions": {
+    "block-bottom": "色块在下",
+    "block-top": "色块在上",
+    "block-left": "色块在左",
+    "block-right": "色块在右"
+  },
+  "distributions": {
+    "scatter": "分散",
+    "gather": "聚集",
+    "edge": "边缘"
+  },
+  "textures": {
+    "none": "无纹理",
+    "fine-paper": "细腻纸张",
+    "fine-noise": "细腻噪点",
+    "grain-paper": "颗粒纸张",
+    "coarse-paper": "粗砂纸"
+  },
+  "gradients": {
+    "linear": "线性",
+    "radial": "径向",
+    "conic": "圆锥"
+  },
+  "sections": {
+    "bgTypeRanking": "底图类型 · 使用排行",
+    "bgColorHot": "底图颜色 · 热门色系",
+    "shapeRanking": "形状类型 · 使用排行",
+    "shapeColorHot": "形状颜色 · 热门色系",
+    "animationRanking": "动画模板 · 使用排行",
+    "compositionRanking": "排版模式 · 使用排行",
+    "distributionRanking": "分布模式 · 使用排行",
+    "textureRanking": "纹理效果 · 使用排行",
+    "gradientRanking": "渐变类型 · 使用排行",
+    "recentActivity": "最近活跃",
+    "efficiency": "效率指标",
+    "uploadRate": "上传成功率",
+    "exportRate": "导出成功率",
+    "creationRate": "创作产出比",
+    "trendChart": "7天活跃趋势",
+    "funnel": "行为漏斗",
+    "hourlyAnalysis": "时段分析",
+    "weekComparison": "周对比",
+    "retentionRate": "留存率",
+    "topFeatures": "热门功能 TOP5",
+    "deviceStats": "设备分布",
+    "dailyInsight": "每日洞察"
+  },
+  "upload": {
+    "title": "上传图片",
+    "dragHint": "拖拽或点击上传",
+    "dropHint": "松开以上传",
+    "processing": "AI 正在处理中...",
+    "success": "上传成功",
+    "failed": "上传失败"
+  },
+  "export": {
+    "png": "导出 PNG",
+    "video": "导出视频",
+    "generating": "正在生成...",
+    "download": "下载"
+  },
+  "text": {
+    "addText": "添加文字",
+    "placeholder": "输入文字...",
+    "font": "字体",
+    "size": "大小",
+    "color": "颜色"
+  },
+  "errors": {
+    "uploadFailed": "上传失败，请重试",
+    "exportFailed": "导出失败，请重试",
+    "apiKeyMissing": "API Key 未配置",
+    "networkError": "网络错误"
+  },
+  "languages": {
+    "zh": "简体中文",
+    "zhTW": "繁體中文",
+    "en": "English",
+    "ko": "한국어",
+    "ja": "日本語"
+  },
+  "chart": {
+    "views": "访问",
+    "upload": "上传",
+    "export": "导出",
+    "actions": "操作",
+    "thisWeek": "本周",
+    "lastWeek": "上周",
+    "day": "天",
+    "hour": "时",
+    "visitors": "访客",
+    "newUsers": "新增",
+    "returnees": "回流",
+    "funnelViews": "访问",
+    "funnelUpload": "上传",
+    "funnelExport": "导出",
+    "funnelShare": "分享"
+  },
+  "insights": {
+    "peakHour": "高峰时段",
+    "mostProductiveDay": "最活跃日",
+    "topCombination": "最热组合",
+    "exportRatio": "导出比例"
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "app": {
+    "title": "HiColor",
+    "subtitle": "AI 배경 애니메이션 생성기"
+  },
+  "nav": {
+    "background": "배경",
+    "elements": "요소",
+    "video": "영상",
+    "stats": "데이터",
+    "language": "언어"
+  },
+  "stats": {
+    "title": "데이터 분석",
+    "visits": "방문",
+    "uploads": "업로드",
+    "exports": "내보내기",
+    "operations": "작업",
+    "consecutiveDays": "연속 일수",
+    "sessions": "세션 수",
+    "avgSession": "평균 세션",
+    "noData": "데이터 없음",
+    "resetConfirm": "모든 통계를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
+    "clearStats": "통계 삭제",
+    "lastVisit": "마지막 방문",
+    "mostUsedFeature": "가장 많이 사용된 기능",
+    "usedTimes": "{count}회 사용됨"
+  },
+  "bgTypes": {
+    "solid": "단색",
+    "split": "분할",
+    "gradient": "그라데이션",
+    "image": "이미지",
+    "grid": "노트북",
+    "diagonal": "그리드",
+    "block": "체커보드",
+    "dots": "점"
+  },
+  "shapeKinds": {
+    "circle": "원형",
+    "square": "사각형",
+    "star": "별",
+    "drop": "물방울",
+    "snowflake": "눈꽃",
+    "heart": "하트",
+    "symbol": "기호",
+    "randomLetters": "임의 문자"
+  },
+  "animations": {
+    "pulse": "펄스",
+    "batch": "배치",
+    "rain": "빗속 산책",
+    "stars": "밝은 별하늘",
+    "rainfall": "천천히 내리는 비"
+  },
+  "compositions": {
+    "block-bottom": "블록 아래",
+    "block-top": "블록 위",
+    "block-left": "블록 왼쪽",
+    "block-right": "블록 오른쪽"
+  },
+  "distributions": {
+    "scatter": "분산",
+    "gather": "응집",
+    "edge": "가장자리"
+  },
+  "textures": {
+    "none": "무텍스처",
+    "fine-paper": "부드러운 종이",
+    "fine-noise": "부드러운 노이즈",
+    "grain-paper": "颗粒 종이",
+    "coarse-paper": "거친 종이"
+  },
+  "gradients": {
+    "linear": "선형",
+    "radial": "방사형",
+    "conic": "원뿔형"
+  },
+  "sections": {
+    "bgTypeRanking": "배경 유형 · 사용 순위",
+    "bgColorHot": "배경 색상 · 인기 색상",
+    "shapeRanking": "도형 유형 · 사용 순위",
+    "shapeColorHot": "도형 색상 · 인기 색상",
+    "animationRanking": "애니메이션 템플릿 · 사용 순위",
+    "compositionRanking": "레이아웃 모드 · 사용 순위",
+    "distributionRanking": "분포 모드 · 사용 순위",
+    "textureRanking": "텍스처 효과 · 사용 순위",
+    "gradientRanking": "그라데이션 유형 · 사용 순위",
+    "recentActivity": "최근 활동",
+    "efficiency": "효율 지표",
+    "uploadRate": "업로드 성공률",
+    "exportRate": "내보내기 성공률",
+    "creationRate": "창작 생산비율",
+    "trendChart": "7일 활동 추세",
+    "funnel": "행동 퍼널",
+    "hourlyAnalysis": "시간대 분석",
+    "weekComparison": "주간 비교",
+    "retentionRate": "유지율",
+    "topFeatures": "인기 기능 TOP5",
+    "deviceStats": "기기 분포",
+    "dailyInsight": "일일 인사이트"
+  },
+  "upload": {
+    "title": "이미지 업로드",
+    "dragHint": "드래그 또는 클릭하여 업로드",
+    "dropHint": "업로드하려면 놓으세요",
+    "processing": "AI 처리 중...",
+    "success": "업로드 성공",
+    "failed": "업로드 실패"
+  },
+  "export": {
+    "png": "PNG 내보내기",
+    "video": "영상 내보내기",
+    "generating": "생성 중...",
+    "download": "다운로드"
+  },
+  "text": {
+    "addText": "텍스트 추가",
+    "placeholder": "텍스트 입력...",
+    "font": "글꼴",
+    "size": "크기",
+    "color": "색상"
+  },
+  "errors": {
+    "uploadFailed": "업로드 실패, 다시 시도하세요",
+    "exportFailed": "내보내기 실패, 다시 시도하세요",
+    "apiKeyMissing": "API Key가 구성되지 않았습니다",
+    "networkError": "네트워크 오류"
+  },
+  "languages": {
+    "zh": "简体中文",
+    "zhTW": "繁體中文",
+    "en": "English",
+    "ko": "한국어",
+    "ja": "日本語"
+  },
+  "chart": {
+    "views": "방문",
+    "upload": "업로드",
+    "export": "내보내기",
+    "actions": "작업",
+    "thisWeek": "이번 주",
+    "lastWeek": "지난 주",
+    "day": "일",
+    "hour": "시",
+    "visitors": "방문자",
+    "newUsers": "신규",
+    "returnees": "재방문",
+    "funnelViews": "방문",
+    "funnelUpload": "업로드",
+    "funnelExport": "내보내기",
+    "funnelShare": "공유"
+  },
+  "insights": {
+    "peakHour": "피크 시간",
+    "mostProductiveDay": "가장 활발한 날",
+    "topCombination": "최고 조합",
+    "exportRatio": "내보내기 비율"
+  }
+}

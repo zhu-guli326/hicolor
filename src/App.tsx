@@ -10,6 +10,8 @@ import { toPng } from 'html-to-image';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { useStats } from './hooks/useStats';
+import { useEnhancedAnalytics } from './hooks/useAnalytics';
+import { useI18n, type Locale, LOCALE_LABELS } from './i18n/index';
 import {
   Upload,
   RefreshCw,
@@ -49,6 +51,7 @@ import {
   Loader2,
   BarChart3,
   RotateCcw,
+  Globe,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -1571,6 +1574,8 @@ function TemplateButton({ label, icon, active, onClick, onDeselect }: { label: s
 export default function App() {
   // --- Stats ---
   const { stats, track, resetStats } = useStats();
+  const { track: trackWithAnalytics, getAnalytics, resetAnalytics } = useEnhancedAnalytics();
+  const { locale, setLocale, t } = useI18n();
   const lastBgTypeRef = useRef<string | null>(null);
   const lastCompositionRef = useRef<string | null>(null);
   const lastShapeKindRef = useRef<string | null>(null);
@@ -1937,91 +1942,91 @@ export default function App() {
   // --- Stats Tracking: 跟踪配置变化（仅在值真正改变时记录） ---
   useEffect(() => {
     if (lastBgTypeRef.current !== null && lastBgTypeRef.current !== bgConfig.type) {
-      track({ type: 'change_bg_type', bgType: bgConfig.type });
+      trackWithAnalytics({ type: 'change_bg_type', bgType: bgConfig.type });
     }
     lastBgTypeRef.current = bgConfig.type;
   }, [bgConfig.type]);
 
   useEffect(() => {
     if (lastCompositionRef.current !== null && lastCompositionRef.current !== composition) {
-      track({ type: 'change_composition', composition });
+      trackWithAnalytics({ type: 'change_composition', composition });
     }
     lastCompositionRef.current = composition;
   }, [composition]);
 
   useEffect(() => {
     if (lastShapeKindRef.current !== null && lastShapeKindRef.current !== cutoutConfig.defaultShapeKind) {
-      track({ type: 'change_shape_kind', shapeKind: cutoutConfig.defaultShapeKind });
+      trackWithAnalytics({ type: 'change_shape_kind', shapeKind: cutoutConfig.defaultShapeKind });
     }
     lastShapeKindRef.current = cutoutConfig.defaultShapeKind;
   }, [cutoutConfig.defaultShapeKind]);
 
   useEffect(() => {
     if (lastDistributionModeRef.current !== null && lastDistributionModeRef.current !== cutoutConfig.distributionMode) {
-      track({ type: 'change_distribution_mode', mode: cutoutConfig.distributionMode });
+      trackWithAnalytics({ type: 'change_distribution_mode', mode: cutoutConfig.distributionMode });
     }
     lastDistributionModeRef.current = cutoutConfig.distributionMode;
   }, [cutoutConfig.distributionMode]);
 
   useEffect(() => {
     if (lastCreationModeRef.current !== null && lastCreationModeRef.current !== cutoutConfig.creationMode) {
-      track({ type: 'change_creation_mode', mode: cutoutConfig.creationMode });
+      trackWithAnalytics({ type: 'change_creation_mode', mode: cutoutConfig.creationMode });
     }
     lastCreationModeRef.current = cutoutConfig.creationMode;
   }, [cutoutConfig.creationMode]);
 
   useEffect(() => {
     if (lastAnimationRef.current !== null && lastAnimationRef.current !== activeAnimation) {
-      track({ type: 'change_animation', animation: activeAnimation });
+      trackWithAnalytics({ type: 'change_animation', animation: activeAnimation });
     }
     lastAnimationRef.current = activeAnimation;
   }, [activeAnimation]);
 
   useEffect(() => {
     if (lastTextureRef.current !== null && lastTextureRef.current !== bgConfig.texture) {
-      track({ type: 'change_texture', textureType: bgConfig.texture });
+      trackWithAnalytics({ type: 'change_texture', textureType: bgConfig.texture });
     }
     lastTextureRef.current = bgConfig.texture;
   }, [bgConfig.texture]);
 
   useEffect(() => {
     if (lastBgColor1Ref.current !== null && lastBgColor1Ref.current !== bgConfig.color1) {
-      track({ type: 'change_bg_color', color: bgConfig.color1, index: 1 });
+      trackWithAnalytics({ type: 'change_bg_color', color: bgConfig.color1, index: 1 });
     }
     lastBgColor1Ref.current = bgConfig.color1;
   }, [bgConfig.color1]);
 
   useEffect(() => {
     if (lastBgColor2Ref.current !== null && lastBgColor2Ref.current !== bgConfig.color2) {
-      track({ type: 'change_bg_color', color: bgConfig.color2, index: 2 });
+      trackWithAnalytics({ type: 'change_bg_color', color: bgConfig.color2, index: 2 });
     }
     lastBgColor2Ref.current = bgConfig.color2;
   }, [bgConfig.color2]);
 
   useEffect(() => {
     if (lastShapeColorRef.current !== null && lastShapeColorRef.current !== cutoutConfig.shapeColor) {
-      track({ type: 'change_shape_color', color: cutoutConfig.shapeColor });
+      trackWithAnalytics({ type: 'change_shape_color', color: cutoutConfig.shapeColor });
     }
     lastShapeColorRef.current = cutoutConfig.shapeColor;
   }, [cutoutConfig.shapeColor]);
 
   useEffect(() => {
     if (lastBaseSizeRef.current !== null && lastBaseSizeRef.current !== cutoutConfig.baseSize) {
-      track({ type: 'change_shape_size', size: cutoutConfig.baseSize });
+      trackWithAnalytics({ type: 'change_shape_size', size: cutoutConfig.baseSize });
     }
     lastBaseSizeRef.current = cutoutConfig.baseSize;
   }, [cutoutConfig.baseSize]);
 
   useEffect(() => {
     if (lastAutoCountRef.current !== null && lastAutoCountRef.current !== cutoutConfig.autoCount) {
-      track({ type: 'change_shape_count', count: cutoutConfig.autoCount });
+      trackWithAnalytics({ type: 'change_shape_count', count: cutoutConfig.autoCount });
     }
     lastAutoCountRef.current = cutoutConfig.autoCount;
   }, [cutoutConfig.autoCount]);
 
   useEffect(() => {
     if (lastVariationRef.current !== null && lastVariationRef.current !== cutoutConfig.variation) {
-      track({ type: 'change_creation_mode', mode: `variation_${cutoutConfig.variation}` });
+      trackWithAnalytics({ type: 'change_creation_mode', mode: `variation_${cutoutConfig.variation}` });
     }
     lastVariationRef.current = cutoutConfig.variation;
   }, [cutoutConfig.variation]);
@@ -2076,7 +2081,7 @@ export default function App() {
 
     // 仅在手动触发（无 imageOverride）时记录统计
     if (!opts?.imageOverride) {
-      track({ type: 'generate_cutouts' });
+      trackWithAnalytics({ type: 'generate_cutouts' });
     }
     const { autoCount, baseSize, variation } = cutoutConfig;
     const count = Math.max(1, Math.round(opts?.autoCount ?? autoCount));
@@ -2314,7 +2319,7 @@ export default function App() {
 
   const handleAnimationSelect = (type: AnimationType) => {
     setActiveAnimation(type);
-    track({ type: 'play_animation' });
+    trackWithAnalytics({ type: 'play_animation' });
     setIsPlaying(true);
     
     if (type === 'stars') {
@@ -2514,7 +2519,7 @@ export default function App() {
           setExportProgress(100);
           setIsExporting(false);
           setShowExportSuccess(true);
-          track({ type: 'export_video' });
+          trackWithAnalytics({ type: 'export_video' });
         } catch (err) {
           console.error('FFmpeg 转码失败:', err);
           // 转码失败时降级：直接返回 webm
@@ -2525,7 +2530,7 @@ export default function App() {
           setExportProgress(100);
           setIsExporting(false);
           setShowExportSuccess(true);
-          track({ type: 'export_video' });
+          trackWithAnalytics({ type: 'export_video' });
         }
       };
 
@@ -2735,7 +2740,7 @@ export default function App() {
         setComposition('block-top'); // Landscape -> 色块在上方
       }
       generateAutoCutouts({ imageOverride: img });
-      track({ type: 'upload_image' });
+      trackWithAnalytics({ type: 'upload_image' });
       setTimeout(fitToScreen, 100);
       fileInput.value = '';
     };
@@ -3525,7 +3530,7 @@ export default function App() {
     });
     if (!blob) return;
 
-    track({ type: 'export_png' });
+    trackWithAnalytics({ type: 'export_png' });
 
     // 1) Web Share + 文件：移动端保存到相册/微信最可靠（async 仍常保留用户激活）
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
@@ -3921,7 +3926,7 @@ export default function App() {
         <button
           type="button"
           onClick={() => {
-            track({ type: 'clear_cutouts' });
+            trackWithAnalytics({ type: 'clear_cutouts' });
             setCutouts([]);
             setSelectedId(null);
           }}
@@ -4161,7 +4166,7 @@ export default function App() {
       {icon}
       <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
       {id === 'video' && (
-        <span className="text-[7px] font-bold text-gray-400">待开发</span>
+        <span className="text-[7px] font-bold text-gray-400">Beta</span>
       )}
       {activeTab === id && (
         <motion.div layoutId="tab-indicator" className="absolute bottom-0 w-8 h-1 bg-green-500 rounded-t-full" />
@@ -4169,12 +4174,14 @@ export default function App() {
     </button>
   );
 
+  const [showLangMenu, setShowLangMenu] = useState(false);
+
   const renderHeader = () => (
     <header className="fixed top-0 left-0 right-0 z-50 flex min-h-14 items-center justify-between border-b border-gray-100 bg-white/80 px-3 pt-[max(0px,env(safe-area-inset-top))] pb-2 backdrop-blur-xl sm:min-h-16 sm:px-6 sm:pb-0">
       <div className="flex items-center">
-        <a 
-          href="https://www.xiaohongshu.com/user/profile/57b3456c82ec3947f79496e9" 
-          target="_blank" 
+        <a
+          href="https://www.xiaohongshu.com/user/profile/57b3456c82ec3947f79496e9"
+          target="_blank"
           rel="noopener noreferrer"
           className="text-lg font-black tracking-tighter text-gray-900 italic leading-none sm:text-xl hover:text-emerald-600 transition-colors cursor-pointer"
           title="访问小红书"
@@ -4183,22 +4190,49 @@ export default function App() {
         </a>
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <button 
+        {/* 语言切换 */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLangMenu(v => !v)}
+            className="rounded-full bg-gray-50 p-2 text-gray-600 transition-all hover:bg-gray-100 active:scale-90"
+            title={t('nav.language')}
+          >
+            <Globe size={18} />
+          </button>
+          {showLangMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />
+              <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 min-w-[140px]">
+                {(Object.entries(LOCALE_LABELS) as [Locale, string][]).map(([l, label]) => (
+                  <button
+                    key={l}
+                    onClick={() => { setLocale(l); setShowLangMenu(false); }}
+                    className={`w-full text-left px-4 py-2 text-[13px] font-bold transition-colors ${
+                      locale === l ? 'text-emerald-600 bg-emerald-50' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <button
           onClick={() => fileInputRef.current?.click()}
           className="rounded-full bg-gray-50 p-2 text-gray-600 transition-all hover:bg-gray-100 active:scale-90 sm:p-2.5"
-          title="上传图片"
+          title={t('upload.title')}
         >
           <Upload size={20} />
         </button>
         {image && (
-          <button 
+          <button
             onClick={handleSave}
             className="group flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-700 active:scale-95 sm:gap-2 sm:px-6 sm:py-2.5"
-            title="保存作品"
+            title={t('export.download')}
           >
             <Download size={18} className="transition-transform group-hover:translate-y-0.5 sm:size-5" />
-            <span className="text-[11px] font-black uppercase tracking-widest sm:text-[13px]">保存</span>
-            <span className="hidden text-[13px] font-black uppercase tracking-widest sm:inline">作品</span>
+            <span className="text-[11px] font-black uppercase tracking-widest sm:text-[13px]">{t('export.png')}</span>
           </button>
         )}
       </div>
@@ -4208,10 +4242,10 @@ export default function App() {
   const renderBottomNav = () => (
     <nav ref={bottomNavRef} className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl border-t border-gray-100 pb-safe z-50">
       <div className="flex justify-around items-center h-14 px-4">
-        {renderTabButton('background', <Palette size={22} />, '背景')}
-        {renderTabButton('elements', <Target size={22} />, '元素')}
-        {renderTabButton('stats', <BarChart3 size={22} />, '统计')}
-        {renderTabButton('video', <Video size={22} />, '视频')}
+        {renderTabButton('background', <Palette size={22} />, t('nav.background'))}
+        {renderTabButton('elements', <Target size={22} />, t('nav.elements'))}
+        {renderTabButton('stats', <BarChart3 size={22} />, t('nav.stats'))}
+        {renderTabButton('video', <Video size={22} />, t('nav.video'))}
       </div>
     </nav>
   );
@@ -4821,7 +4855,15 @@ export default function App() {
             </motion.div>
           )}
 
-          {activeTab === 'stats' && (
+          {activeTab === 'stats' && (() => {
+            const analytics = getAnalytics();
+            const hourLabel = (h: number) => {
+              const labels: Record<string, string> = {
+                zh: `${h}时`, zhTW: `${h}時`, en: `${h}:00`, ko: `${h}시`, ja: `${h}時`
+              };
+              return labels[locale] || `${h}:00`;
+            };
+            return (
             <motion.div
               key="stats"
               initial={{ opacity: 0 }}
@@ -4829,25 +4871,25 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="space-y-5"
             >
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">数据分析</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{t('stats.title')}</h3>
 
               {/* 概览卡片 - 核心指标 */}
               <div className="grid grid-cols-4 gap-2">
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
                   <div className="text-lg font-black text-emerald-600">{stats.visitCount}</div>
-                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">访问</div>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">{t('stats.visits')}</div>
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
                   <div className="text-lg font-black text-emerald-600">{stats.totalUploads}</div>
-                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">上传</div>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">{t('stats.uploads')}</div>
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
                   <div className="text-lg font-black text-emerald-600">{stats.totalExports}</div>
-                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">导出</div>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">{t('stats.exports')}</div>
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
                   <div className="text-lg font-black text-emerald-600">{stats.totalActions}</div>
-                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">操作</div>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wider">{t('stats.operations')}</div>
                 </div>
               </div>
 
@@ -4855,34 +4897,187 @@ export default function App() {
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2 text-center">
                   <div className="text-lg font-black text-emerald-600">{stats.currentStreak}</div>
-                  <div className="text-[7px] font-bold text-emerald-500">连续天数</div>
+                  <div className="text-[7px] font-bold text-emerald-500">{t('stats.consecutiveDays')}</div>
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
                   <div className="text-lg font-black text-gray-900">{stats.sessionCount}</div>
-                  <div className="text-[7px] font-bold text-gray-400">会话数</div>
+                  <div className="text-[7px] font-bold text-gray-400">{t('stats.sessions')}</div>
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2 text-center">
                   <div className="text-lg font-black text-gray-900">{stats.avgSessionMinutes || 0}<span className="text-[10px]">m</span></div>
-                  <div className="text-[7px] font-bold text-gray-400">均会话</div>
+                  <div className="text-[7px] font-bold text-gray-400">{t('stats.avgSession')}</div>
                 </div>
               </div>
 
               {/* 7天活跃趋势图 */}
               {renderTrendChart()}
 
+              {/* 时段分析 - 24小时活跃热力条 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.hourlyAnalysis')}</h4>
+                <div className="bg-gray-50/40 rounded-xl border border-gray-100 p-3">
+                  <div className="flex items-end gap-[2px] h-12">
+                    {analytics.hourlyData.map((d) => {
+                      const maxActions = Math.max(...analytics.hourlyData.map(x => x.actions), 1);
+                      const height = maxActions > 0 ? Math.round((d.actions / maxActions) * 100) : 0;
+                      const isPeak = d.hour === analytics.peakHour && d.actions > 0;
+                      return (
+                        <div key={d.hour} className="flex-1 flex flex-col items-center gap-0.5 group cursor-default">
+                          <div
+                            className={`w-full rounded-t-sm transition-all ${isPeak ? 'bg-amber-400' : 'bg-blue-300'} hover:bg-blue-400`}
+                            style={{ height: `${Math.max(height, 4)}px` }}
+                            title={`${d.hour}:00 - ${t('chart.actions')}:${d.actions} ${t('chart.upload')}:${d.uploads} ${t('chart.export')}:${d.exports}`}
+                          />
+                          {d.hour % 6 === 0 && (
+                            <span className="text-[6px] text-gray-400 font-mono">{d.hour}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[7px] text-gray-400">0:00</span>
+                    <span className="text-[7px] text-amber-500 font-bold">
+                      {t('insights.peakHour')}: {hourLabel(analytics.peakHour)} ({analytics.hourlyData[analytics.peakHour]?.actions || 0}{t('chart.actions')})
+                    </span>
+                    <span className="text-[7px] text-gray-400">23:00</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 周对比 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.weekComparison')}</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-2">
+                    <div className="text-[7px] text-gray-400 uppercase tracking-wider mb-1">{t('chart.thisWeek')}</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[8px]">
+                        <span className="text-gray-500">{t('chart.visitors')}</span>
+                        <span className="font-bold text-emerald-600">{analytics.weekComparison.thisWeek.visits}</span>
+                      </div>
+                      <div className="flex justify-between text-[8px]">
+                        <span className="text-gray-500">{t('chart.upload')}</span>
+                        <span className="font-bold text-blue-600">{analytics.weekComparison.thisWeek.uploads}</span>
+                      </div>
+                      <div className="flex justify-between text-[8px]">
+                        <span className="text-gray-500">{t('chart.export')}</span>
+                        <span className="font-bold text-purple-600">{analytics.weekComparison.thisWeek.exports}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-2">
+                    <div className="text-[7px] text-gray-400 uppercase tracking-wider mb-1">{t('chart.lastWeek')}</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[8px]">
+                        <span className="text-gray-500">{t('chart.visitors')}</span>
+                        <span className="font-bold text-gray-400">{analytics.weekComparison.lastWeek.visits}</span>
+                      </div>
+                      <div className="flex justify-between text-[8px]">
+                        <span className="text-gray-500">{t('chart.upload')}</span>
+                        <span className="font-bold text-gray-400">{analytics.weekComparison.lastWeek.uploads}</span>
+                      </div>
+                      <div className="flex justify-between text-[8px]">
+                        <span className="text-gray-500">{t('chart.export')}</span>
+                        <span className="font-bold text-gray-400">{analytics.weekComparison.lastWeek.exports}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* 增长率 */}
+                <div className="flex gap-3 justify-center">
+                  {[
+                    { key: 'visits' as const, color: 'text-emerald-500', icon: '▲' },
+                    { key: 'uploads' as const, color: 'text-blue-500', icon: '▲' },
+                    { key: 'exports' as const, color: 'text-purple-500', icon: '▲' },
+                    { key: 'actions' as const, color: 'text-amber-500', icon: '▲' },
+                  ].map(({ key, color, icon }) => {
+                    const growth = analytics.weekComparison.growth[key];
+                    return (
+                      <div key={key} className={`text-[8px] font-bold ${growth >= 0 ? color : 'text-red-400'}`}>
+                        {growth >= 0 ? icon : '▼'} {Math.abs(growth)}%
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 留存率 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.retentionRate')}</h4>
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { label: '次日', value: analytics.retentionData.day1, color: 'emerald' },
+                    { label: '3日', value: Math.round((analytics.retentionData.day7 + analytics.retentionData.day1) / 2), color: 'blue' },
+                    { label: '7日', value: analytics.retentionData.day7, color: 'purple' },
+                    { label: '30日', value: analytics.retentionData.day30, color: 'amber' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className={`rounded-lg border border-${color}-100 bg-${color}-50/50 p-2 text-center`}>
+                      <div className={`text-sm font-black text-${color}-600`}>{value}%</div>
+                      <div className={`text-[7px] font-bold text-${color}-400`}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 设备分布 */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.deviceStats')}</h4>
+                <div className="flex gap-2 bg-gray-50/40 rounded-xl border border-gray-100 p-3">
+                  {analytics.deviceStats.map((d) => {
+                    const deviceLabels: Record<string, string> = {
+                      mobile: { zh: '📱 手机', zhTW: '📱 手機', en: '📱 Mobile', ko: '📱 모바일', ja: '📱 モバイル' }[locale] || '📱 Mobile',
+                      tablet: { zh: '平板', zhTW: '平板', en: 'Tablet', ko: '태블릿', ja: 'タブレット' }[locale] || 'Tablet',
+                      desktop: { zh: '💻 桌面', zhTW: '💻 桌面', en: '💻 Desktop', ko: '💻 데스크톱', ja: '💻 デスクトップ' }[locale] || '💻 Desktop',
+                    };
+                    return (
+                      <div key={d.device} className="flex-1 text-center">
+                        <div className="text-[10px] font-bold text-gray-700">{deviceLabels[d.device]}</div>
+                        <div className="text-[9px] text-gray-400">{d.visits}x</div>
+                        <div className="mt-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${d.device === 'mobile' ? 'bg-blue-400' : d.device === 'tablet' ? 'bg-purple-400' : 'bg-emerald-400'}`}
+                            style={{ width: `${Math.max(d.percentage, 5)}%` }}
+                          />
+                        </div>
+                        <div className="text-[7px] text-gray-400 mt-0.5">{d.percentage}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 每日洞察 */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-2.5">
+                  <div className="text-[7px] font-bold text-blue-500 uppercase tracking-wider">{t('insights.peakHour')}</div>
+                  <div className="text-sm font-black text-blue-700 mt-0.5">{hourLabel(analytics.peakHour)}</div>
+                  <div className="text-[7px] text-blue-400 mt-0.5">
+                    {analytics.hourlyData[analytics.peakHour]?.actions || 0}{t('chart.actions')}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-2.5">
+                  <div className="text-[7px] font-bold text-purple-500 uppercase tracking-wider">{t('insights.exportRatio')}</div>
+                  <div className="text-sm font-black text-purple-700 mt-0.5">{analytics.exportRatio}%</div>
+                  <div className="text-[7px] text-purple-400 mt-0.5">
+                    {stats.totalExports}/{stats.totalUploads} {t('chart.export')}
+                  </div>
+                </div>
+              </div>
+
               {/* 行为漏斗 */}
               {renderFunnel()}
 
               {/* 效率指标 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">效率指标</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.efficiency')}</h4>
                 <div className="flex justify-around items-center bg-gray-50/50 rounded-xl border border-gray-100 p-3">
-                  {renderCircleProgress(stats.uploadSuccessRate, 100, '上传成功率', 'emerald')}
-                  {renderCircleProgress(stats.exportSuccessRate, 100, '导出成功率', 'blue')}
+                  {renderCircleProgress(stats.uploadSuccessRate, 100, t('sections.uploadRate'), 'emerald')}
+                  {renderCircleProgress(stats.exportSuccessRate, 100, t('sections.exportRate'), 'blue')}
                   {renderCircleProgress(
                     stats.totalExports > 0 ? (stats.totalUploads / stats.totalExports) : 0,
                     Math.max(stats.totalUploads, 1),
-                    '创作产出比',
+                    t('sections.creationRate'),
                     'purple'
                   )}
                 </div>
@@ -4891,108 +5086,108 @@ export default function App() {
               {/* 最热功能标签 */}
               {stats.mostUsedFeature && stats.featureCounts[stats.mostUsedFeature] > 0 && (
                 <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3">
-                  <div className="text-[8px] font-bold text-amber-600 uppercase tracking-wider mb-1">🏆 最常用功能</div>
+                  <div className="text-[8px] font-bold text-amber-600 uppercase tracking-wider mb-1">{t('stats.mostUsedFeature')}</div>
                   <div className="text-sm font-black text-amber-700">
                     {stats.mostUsedFeature.replace(/_/g, ' ')}
                   </div>
                   <div className="text-[9px] text-amber-500 mt-0.5">
-                    已使用 {stats.featureCounts[stats.mostUsedFeature]} 次
+                    {t('stats.usedTimes', { count: stats.featureCounts[stats.mostUsedFeature] })}
                   </div>
                 </div>
               )}
 
               {stats.lastVisit && (
                 <p className="text-[9px] text-gray-400 font-bold text-center">
-                  最后访问：{stats.lastVisit}
+                  {t('stats.lastVisit')}：{stats.lastVisit}
                 </p>
               )}
 
               {/* 功能热度排名 - 底图类型 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">底图类型 · 使用排行</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.bgTypeRanking')}</h4>
                 {renderStatBar('bgTypeUsage', {
-                  solid: '纯色', split: '双拼色', gradient: '渐变', image: '图片',
-                  grid: '笔记本', diagonal: '格子', block: '棋盘格', dots: '点阵',
+                  solid: t('bgTypes.solid'), split: t('bgTypes.split'), gradient: t('bgTypes.gradient'), image: t('bgTypes.image'),
+                  grid: t('bgTypes.grid'), diagonal: t('bgTypes.diagonal'), block: t('bgTypes.block'), dots: t('bgTypes.dots'),
                 })}
               </div>
 
               {/* 底图颜色使用热力图 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">底图颜色 · 热门色系</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.bgColorHot')}</h4>
                 {renderColorBar(stats.bgColorUsage)}
               </div>
 
               {/* 形状类型使用排行 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">形状类型 · 使用排行</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.shapeRanking')}</h4>
                 {renderStatBar('shapeKindUsage', {
-                  circle: '圆形', square: '方形', star: '星形', drop: '水滴',
-                  snowflake: '雪花', heart: '爱心', symbol: '符号', randomLetters: '随机字母',
+                  circle: t('shapeKinds.circle'), square: t('shapeKinds.square'), star: t('shapeKinds.star'), drop: t('shapeKinds.drop'),
+                  snowflake: t('shapeKinds.snowflake'), heart: t('shapeKinds.heart'), symbol: t('shapeKinds.symbol'), randomLetters: t('shapeKinds.randomLetters'),
                 })}
               </div>
 
               {/* 形状颜色使用热力图 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">形状颜色 · 热门色系</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.shapeColorHot')}</h4>
                 {renderColorBar(stats.shapeColorUsage)}
               </div>
 
               {/* 动画模板使用排行 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">动画模板 · 使用排行</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.animationRanking')}</h4>
                 {renderStatBar('animationUsage', {
-                  pulse: '形状叠加', batch: '形状切换', rain: '漫步雨季',
-                  stars: '璀璨星河', rainfall: '慢步雨季',
+                  pulse: t('animations.pulse'), batch: t('animations.batch'), rain: t('animations.rain'),
+                  stars: t('animations.stars'), rainfall: t('animations.rainfall'),
                 })}
               </div>
 
               {/* 排版模式使用排行 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">排版模式 · 使用排行</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.compositionRanking')}</h4>
                 {renderStatBar('compositionUsage', {
-                  'block-bottom': '色块在下', 'block-top': '色块在上',
-                  'block-left': '色块在左', 'block-right': '色块在右',
+                  'block-bottom': t('compositions.block-bottom'), 'block-top': t('compositions.block-top'),
+                  'block-left': t('compositions.block-left'), 'block-right': t('compositions.block-right'),
                 })}
               </div>
 
               {/* 分布模式使用排行 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">分布模式 · 使用排行</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.distributionRanking')}</h4>
                 {renderStatBar('distributionModeUsage', {
-                  scatter: '分散', gather: '聚集', edge: '边缘',
+                  scatter: t('distributions.scatter'), gather: t('distributions.gather'), edge: t('distributions.edge'),
                 })}
               </div>
 
               {/* 纹理类型使用排行 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">纹理效果 · 使用排行</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.textureRanking')}</h4>
                 {renderStatBar('textureUsage', {
-                  'none': '无纹理', 'fine-paper': '细腻纸张', 'fine-noise': '细腻噪点',
-                  'grain-paper': '颗粒纸张', 'coarse-paper': '粗砂纸',
+                  'none': t('textures.none'), 'fine-paper': t('textures.fine-paper'), 'fine-noise': t('textures.fine-noise'),
+                  'grain-paper': t('textures.grain-paper'), 'coarse-paper': t('textures.coarse-paper'),
                 })}
               </div>
 
               {/* 渐变类型使用排行 */}
               <div className="space-y-2">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">渐变类型 · 使用排行</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.gradientRanking')}</h4>
                 {renderStatBar('gradientUsage', {
-                  linear: '线性', radial: '径向', conic: '圆锥',
+                  linear: t('gradients.linear'), radial: t('gradients.radial'), conic: t('gradients.conic'),
                 })}
               </div>
 
               {/* 每日统计数据 */}
               {stats.dailyStats && stats.dailyStats.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">最近活跃</h4>
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.recentActivity')}</h4>
                   <div className="space-y-1">
                     {stats.dailyStats.slice(-5).reverse().map((day: any) => (
                       <div key={day.date} className="flex items-center justify-between text-[8px] text-gray-500 bg-gray-50/50 rounded px-2 py-1">
                         <span>{day.date}</span>
                         <div className="flex gap-4">
-                          <span>访问<span className="font-bold text-emerald-600 ml-1">{day.visitCount}</span></span>
-                          <span>上传<span className="font-bold text-blue-600 ml-1">{day.uploads}</span></span>
-                          <span>导出<span className="font-bold text-purple-600 ml-1">{day.exports}</span></span>
-                          <span>操作<span className="font-bold text-gray-700 ml-1">{day.actionsCount}</span></span>
+                          <span>{t('chart.views')}<span className="font-bold text-emerald-600 ml-1">{day.visitCount}</span></span>
+                          <span>{t('chart.upload')}<span className="font-bold text-blue-600 ml-1">{day.uploads}</span></span>
+                          <span>{t('chart.export')}<span className="font-bold text-purple-600 ml-1">{day.exports}</span></span>
+                          <span>{t('chart.actions')}<span className="font-bold text-gray-700 ml-1">{day.actionsCount}</span></span>
                         </div>
                       </div>
                     ))}
@@ -5004,17 +5199,18 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('确定要清除所有统计数据吗？此操作不可恢复。')) {
-                    resetStats();
+                  if (window.confirm(t('stats.resetConfirm'))) {
+                    resetAnalytics();
                   }
                 }}
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-gray-200 text-gray-400 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-50 hover:text-gray-600 transition-all"
               >
                 <RotateCcw size={12} />
-                <span>清除统计数据</span>
+                <span>{t('stats.clearStats')}</span>
               </button>
             </motion.div>
-          )}
+            );
+          })()}
 
           {activeTab === 'video' && (
             <motion.div
@@ -5033,28 +5229,28 @@ export default function App() {
                   icon={<Maximize className="w-4 h-4" />} 
                   active={activeAnimation === 'pulse'}
                   onClick={() => handleAnimationSelect('pulse')}
-                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); track({ type: 'stop_animation' }); }}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton 
                   label="形状切换" 
                   icon={<Layers size={4} className="w-4 h-4" />} 
                   active={activeAnimation === 'batch'}
                   onClick={() => handleAnimationSelect('batch')}
-                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); track({ type: 'stop_animation' }); }}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton 
                   label="漫步雨季" 
                   icon={<CloudRain className="w-4 h-4" />} 
                   active={activeAnimation === 'rain'}
                   onClick={() => handleAnimationSelect('rain')}
-                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); track({ type: 'stop_animation' }); }}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton
                   label="璀璨星河"
                   icon={<Star className="w-4 h-4" />}
                   active={activeAnimation === 'stars'}
                   onClick={() => handleAnimationSelect('stars')}
-                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); track({ type: 'stop_animation' }); }}
+                  onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
                 />
                 <div className="relative">
                   <button
@@ -5422,7 +5618,7 @@ export default function App() {
                 {activeAnimation !== 'none' && !isPlaying && image && (
                   <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
                     <button
-                      onClick={() => { setIsPlaying(true); track({ type: 'play_animation' }); }}
+                      onClick={() => { setIsPlaying(true); trackWithAnalytics({ type: 'play_animation' }); }}
                       className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
                     >
                       <Play className="text-emerald-600 w-6 h-6 fill-emerald-600 ml-1" />
