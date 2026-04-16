@@ -20,6 +20,7 @@
     "sessions": "會話數",
     "avgSession": "均會話",
     "noData": "暫無數據",
+    "behaviorFunnel": "行為漏斗",
     "resetConfirm": "確定要清除所有統計數據嗎？此操作不可恢復。",
     "clearStats": "清除統計數據",
     "lastVisit": "最後訪問",
@@ -44,14 +45,42 @@
     "snowflake": "雪花",
     "heart": "愛心",
     "symbol": "符號",
-    "randomLetters": "隨機字母"
+    "randomLetters": "隨機字母",
+    "random": "隨機形狀"
+  },
+  "elements": {
+    "shape": "形狀",
+    "overlay": "疊字",
+    "shapeType": "形狀類型",
+    "shapeAdjust": "旋轉角度",
+    "shapeSize": "大小縮放",
+    "shapeCount": "形狀數量",
+    "shapeVariation": "隨機差異",
+    "shapeColor": "形狀顏色",
+    "shapeDistribution": "分佈模式",
+    "symbolPool": "符號池",
+    "symbolPlaceholder": "輸入符號，如 ★♥●",
+    "clearShapes": "清空形狀",
+    "cancelShape": "取消",
+    "scatterCount": "每槽散落數量",
+    "distribution": "元素打散",
+    "manualAdd": "手動添加",
+    "creationMode": "生成方式",
+    "editingShape": "正在編輯選中形狀",
+    "autoModeAdjustable": "自動模式下可調",
+    "shapeColorHint": "形狀顏色控制色塊側散落形狀群內部的填色（主圖形狀顏色自動跟隨條紋/純色底色）。",
+    "autoGenerate": "自動生成",
+    "manualClick": "手動點擊"
   },
   "animations": {
     "pulse": "形狀疊加",
     "batch": "形狀切換",
     "rain": "漫步雨季",
     "stars": "璀璨星河",
-    "rainfall": "慢步雨季"
+    "rainfall": "慢步雨季",
+    "template": "動畫模板",
+    "moreTemplates": "更多模板",
+    "comingSoon": "待開發"
   },
   "compositions": {
     "block-bottom": "色塊在下",
@@ -106,13 +135,18 @@
     "dropHint": "鬆開以上傳",
     "processing": "AI 正在處理中...",
     "success": "上傳成功",
-    "failed": "上傳失敗"
+    "failed": "上傳失敗",
+    "startCreating": "上傳圖片開始創作"
   },
   "export": {
     "png": "導出 PNG",
     "video": "導出影片",
     "generating": "正在生成...",
     "download": "下載"
+  },
+  "video": {
+    "ready": "影片已準備就緒",
+    "exportSuccess": "導出成功！"
   },
   "text": {
     "addText": "添加文字",
@@ -121,11 +155,64 @@
     "size": "大小",
     "color": "顏色"
   },
+  "elements": {
+    "shape": "形狀",
+    "overlay": "疊字",
+    "shapeType": "形狀類型",
+    "shapeAdjust": "形狀調整",
+    "shapeSize": "大小",
+    "shapeCount": "數量",
+    "shapeVariation": "變化",
+    "shapeColor": "顏色",
+    "shapeDistribution": "分佈",
+    "symbolPool": "符號池",
+    "symbolPlaceholder": "輸入符號，如 ★♥●",
+    "clearShapes": "清空形狀",
+    "cancelShape": "取消形狀",
+    "scatterCount": "每槽散落數量"
+  },
+  "overlay": {
+    "text": "文字",
+    "font": "字體",
+    "style": "樣式",
+    "fontSize": "字體大小",
+    "fillColor": "填充顏色",
+    "strokeColor": "描邊顏色",
+    "usePhotoFill": "圖片填充",
+    "placeholder": "寫一句話…可換行",
+    "delete": "刪除",
+    "deleteSelected": "刪除選中形狀"
+  },
+  "background": {
+    "layout": "排版模式",
+    "colorRatio": "色塊佔比",
+    "bgType": "背景類型",
+    "color": "顏色",
+    "gradient": "漸變",
+    "gradientType": "漸變類型",
+    "texture": "紋理",
+    "animation": "動畫",
+    "position": "位置",
+    "stripeWidth": "條紋寬度",
+    "patternDensity": "圖案密度",
+    "gradientAngle": "漸變角度",
+    "bgImage": "背景圖片",
+    "changeImage": "更換圖片",
+    "uploadImage": "上傳圖片"
+  },
   "errors": {
     "uploadFailed": "上傳失敗，請重試",
     "exportFailed": "導出失敗，請重試",
     "apiKeyMissing": "API Key 未配置",
-    "networkError": "網路錯誤"
+    "networkError": "網路錯誤",
+    "pickingColor": "請點擊畫面中的位置進行取色..."
+  },
+  "common": {
+    "on": "開",
+    "off": "關",
+    "regenerate": "重新生成",
+    "clear": "清除",
+    "collapse": "收起設定面板"
   },
   "languages": {
     "zh": "簡體中文",
@@ -156,5 +243,74 @@
     "mostProductiveDay": "最活躍日",
     "topCombination": "最熱組合",
     "exportRatio": "導出比例"
+  },
+  "fonts": {
+    "Special Elite": "Special Elite",
+    "Huiwen-mincho": "匯文明朝體",
+    "Noto Sans SC": "Noto Sans SC",
+    "Noto Serif SC": "Noto Serif SC",
+    "Noto Sans JP": "Noto Sans JP",
+    "Noto Serif JP": "Noto Serif JP",
+    "Noto Sans KR": "Noto Sans KR",
+    "Ma Shan Zheng": "Ma Shan Zheng",
+    "ZCOOL XiaoWei": "ZCOOL XiaoWei",
+    "ZCOOL QingKe HuangYou": "ZCOOL QingKe HuangYou",
+    "Long Cang": "Long Cang",
+    "Liu Jian Mao Cao": "Liu Jian Mao Cao",
+    "Yi Shi Jiti": "Yi Shi Jiti",
+    "Homemade Apple": "Homemade Apple",
+    "Cinzel": "Cinzel",
+    "Oswald": "Oswald",
+    "Bebas Neue": "Bebas Neue",
+    "Anton": "Anton",
+    "Playfair Display": "Playfair Display",
+    "Permanent Marker": "Permanent Marker",
+    "Press Start 2P": "Press Start 2P",
+    "Righteous": "Righteous",
+    "Dancing Script": "Dancing Script",
+    "Satisfy": "Satisfy",
+    "Great Vibes": "Great Vibes",
+    "Monoton": "Monoton",
+    "Russo One": "Russo One",
+    "Bungee": "Bungee",
+    "Black Ops One": "Black Ops One",
+    "Staatliches": "Staatliches",
+    "Abril Fatface": "Abril Fatface",
+    "Alfa Slab One": "Alfa Slab One",
+    "Paytone One": "Paytone One",
+    "Syncopate": "Syncopate",
+    "Poiret One": "Poiret One",
+    "Comfortaa": "Comfortaa",
+    "Yeseva One": "Yeseva One",
+    "Lobster": "Lobster",
+    "Orbitron": "Orbitron",
+    "Acme": "Acme",
+    "Boogaloo": "Boogaloo",
+    "Fredoka One": "Fredoka One",
+    "Lilita One": "Lilita One",
+    "Big Shoulders Display": "Big Shoulders Display",
+    "Arvo": "Arvo",
+    "Lato": "Lato",
+    "Rajdhani": "Rajdhani",
+    "Rubik Mono One": "Rubik Mono One",
+    "Rubik Bubbles": "Rubik Bubbles",
+    "Shojumaru": "Shojumaru",
+    "Bungee Inline": "Bungee Inline",
+    "Spirax": "Spirax",
+    "Knewave": "Knewave",
+    "recommended": "中文推薦",
+    "recommendedJA": "日文推薦",
+    "recommendedKO": "韓文推薦"
+  },
+  "retention": {
+    "day1": "次日",
+    "day3": "3日",
+    "day7": "7日",
+    "day30": "30日"
+  },
+  "device": {
+    "mobile": "手機",
+    "tablet": "平板",
+    "desktop": "桌面"
   }
 }

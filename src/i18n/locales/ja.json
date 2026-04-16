@@ -20,6 +20,7 @@
     "sessions": "セッション数",
     "avgSession": "平均セッション",
     "noData": "データなし",
+    "behaviorFunnel": "行動ファネル",
     "resetConfirm": "すべての統計を削除してもよろしいですか？この操作は取り消せません。",
     "clearStats": "統計を削除",
     "lastVisit": "最終訪問",
@@ -44,14 +45,42 @@
     "snowflake": "雪の結晶",
     "heart": "ハート",
     "symbol": "記号",
-    "randomLetters": "ランダム文字"
+    "randomLetters": "ランダム文字",
+    "random": "ランダム"
+  },
+  "elements": {
+    "shape": "形状",
+    "overlay": "オーバーレイ",
+    "shapeType": "形状タイプ",
+    "shapeAdjust": "回転角度",
+    "shapeSize": "サイズ",
+    "shapeCount": "形状数",
+    "shapeVariation": "ランダム差異",
+    "shapeColor": "形状色",
+    "shapeDistribution": "分布モード",
+    "symbolPool": "シンボルプール",
+    "symbolPlaceholder": "記号を入力、例 ★♥●",
+    "clearShapes": "全消去",
+    "cancelShape": "キャンセル",
+    "scatterCount": "散布数量",
+    "distribution": "散布",
+    "manualAdd": "手動追加",
+    "creationMode": "生成モード",
+    "editingShape": "選択した形状を編集中",
+    "autoModeAdjustable": "自動モードで調整可能",
+    "shapeColorHint": "形状色は色ブロック側の散らばった形状群の塗りつぶしを制御します（メイン画像の形状は自動的にストライプ/単色背景色に従います）。",
+    "autoGenerate": "自動生成",
+    "manualClick": "手動クリック"
   },
   "animations": {
     "pulse": "パルス",
     "batch": "バッチ",
     "rain": "雨の中散歩",
     "stars": "輝く星空",
-    "rainfall": "穏やかな雨"
+    "rainfall": "穏やかな雨",
+    "template": "アニメーションテンプレート",
+    "moreTemplates": "他のテンプレート",
+    "comingSoon": "開発中"
   },
   "compositions": {
     "block-bottom": "ブロック下",
@@ -106,13 +135,18 @@
     "dropHint": "離してアップロード",
     "processing": "AI処理中...",
     "success": "アップロード成功",
-    "failed": "アップロード失敗"
+    "failed": "アップロード失敗",
+    "startCreating": "画像をアップロードして作成開始"
   },
   "export": {
     "png": "PNGエクスポート",
     "video": "動画エクスポート",
     "generating": "生成中...",
     "download": "ダウンロード"
+  },
+  "video": {
+    "ready": "動画の準備完了",
+    "exportSuccess": "エクスポート成功！"
   },
   "text": {
     "addText": "テキストを追加",
@@ -121,11 +155,64 @@
     "size": "サイズ",
     "color": "色"
   },
+  "elements": {
+    "shape": "シェイプ",
+    "overlay": "テキスト",
+    "shapeType": "シェイプタイプ",
+    "shapeAdjust": "シェイプ調整",
+    "shapeSize": "サイズ",
+    "shapeCount": "数量",
+    "shapeVariation": "変化",
+    "shapeColor": "色",
+    "shapeDistribution": "分布",
+    "symbolPool": "記号プール",
+    "symbolPlaceholder": "記号を入力、例 ★♥●",
+    "clearShapes": "すべてクリア",
+    "cancelShape": "キャンセル",
+    "scatterCount": "散布数量"
+  },
+  "overlay": {
+    "text": "テキスト",
+    "font": "フォント",
+    "style": "スタイル",
+    "fontSize": "フォントサイズ",
+    "fillColor": "塗りつぶし色",
+    "strokeColor": "ストローク色",
+    "usePhotoFill": "写真塗りつぶし",
+    "placeholder": "テキストを入力...（改行可能）",
+    "delete": "削除",
+    "deleteSelected": "選択した形状を削除"
+  },
+  "background": {
+    "layout": "レイアウト",
+    "colorRatio": "色比率",
+    "bgType": "背景タイプ",
+    "color": "色",
+    "gradient": "グラデーション",
+    "gradientType": "グラデーションタイプ",
+    "texture": "テクスチャ",
+    "animation": "アニメーション",
+    "position": "位置",
+    "stripeWidth": "ストライプ幅",
+    "patternDensity": "パターン密度",
+    "gradientAngle": "グラデーション角度",
+    "bgImage": "背景画像",
+    "changeImage": "画像を変更",
+    "uploadImage": "画像をアップロード"
+  },
   "errors": {
     "uploadFailed": "アップロード失敗、再試行してください",
     "exportFailed": "エクスポート失敗、再試行してください",
     "apiKeyMissing": "API Keyが設定されていません",
-    "networkError": "ネットワークエラー"
+    "networkError": "ネットワークエラー",
+    "pickingColor": "画像をクリックして色を選択してください..."
+  },
+  "common": {
+    "on": "オン",
+    "off": "オフ",
+    "regenerate": "再生成",
+    "clear": "クリア",
+    "collapse": "設定パネルを折りたたむ"
   },
   "languages": {
     "zh": "简体中文",
@@ -156,5 +243,74 @@
     "mostProductiveDay": "最も活発な日",
     "topCombination": "人気組み合わせ",
     "exportRatio": "エクスポート比率"
+  },
+  "fonts": {
+    "Special Elite": "Special Elite",
+    "Huiwen-mincho": "匯文明朝体",
+    "Noto Sans SC": "Noto Sans SC",
+    "Noto Serif SC": "Noto Serif SC",
+    "Noto Sans JP": "Noto Sans JP",
+    "Noto Serif JP": "Noto Serif JP",
+    "Noto Sans KR": "Noto Sans KR",
+    "Ma Shan Zheng": "Ma Shan Zheng",
+    "ZCOOL XiaoWei": "ZCOOL XiaoWei",
+    "ZCOOL QingKe HuangYou": "ZCOOL QingKe HuangYou",
+    "Long Cang": "Long Cang",
+    "Liu Jian Mao Cao": "Liu Jian Mao Cao",
+    "Yi Shi Jiti": "Yi Shi Jiti",
+    "Homemade Apple": "Homemade Apple",
+    "Cinzel": "Cinzel",
+    "Oswald": "Oswald",
+    "Bebas Neue": "Bebas Neue",
+    "Anton": "Anton",
+    "Playfair Display": "Playfair Display",
+    "Permanent Marker": "Permanent Marker",
+    "Press Start 2P": "Press Start 2P",
+    "Righteous": "Righteous",
+    "Dancing Script": "Dancing Script",
+    "Satisfy": "Satisfy",
+    "Great Vibes": "Great Vibes",
+    "Monoton": "Monoton",
+    "Russo One": "Russo One",
+    "Bungee": "Bungee",
+    "Black Ops One": "Black Ops One",
+    "Staatliches": "Staatliches",
+    "Abril Fatface": "Abril Fatface",
+    "Alfa Slab One": "Alfa Slab One",
+    "Paytone One": "Paytone One",
+    "Syncopate": "Syncopate",
+    "Poiret One": "Poiret One",
+    "Comfortaa": "Comfortaa",
+    "Yeseva One": "Yeseva One",
+    "Lobster": "Lobster",
+    "Orbitron": "Orbitron",
+    "Acme": "Acme",
+    "Boogaloo": "Boogaloo",
+    "Fredoka One": "Fredoka One",
+    "Lilita One": "Lilita One",
+    "Big Shoulders Display": "Big Shoulders Display",
+    "Arvo": "Arvo",
+    "Lato": "Lato",
+    "Rajdhani": "Rajdhani",
+    "Rubik Mono One": "Rubik Mono One",
+    "Rubik Bubbles": "Rubik Bubbles",
+    "Shojumaru": "Shojumaru",
+    "Bungee Inline": "Bungee Inline",
+    "Spirax": "Spirax",
+    "Knewave": "Knewave",
+    "recommended": "中文推奨",
+    "recommendedJA": "日本語推奨",
+    "recommendedKO": "韓国語推奨"
+  },
+  "retention": {
+    "day1": "1日目",
+    "day3": "3日目",
+    "day7": "7日目",
+    "day30": "30日目"
+  },
+  "device": {
+    "mobile": "モバイル",
+    "tablet": "タブレット",
+    "desktop": "デスクトップ"
   }
 }

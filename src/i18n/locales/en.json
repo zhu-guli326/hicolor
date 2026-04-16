@@ -10,6 +10,59 @@
     "stats": "Stats",
     "language": "Language"
   },
+  "elements": {
+    "shape": "Shape",
+    "overlay": "Text",
+    "shapeType": "Shape Type",
+    "shapeAdjust": "Adjust Shape",
+    "shapeSize": "Size",
+    "shapeCount": "Count",
+    "shapeVariation": "Variation",
+    "shapeColor": "Color",
+    "shapeDistribution": "Distribution",
+    "symbolPool": "Symbol Pool",
+    "symbolPlaceholder": "Enter symbols, e.g. ★♥●",
+    "clearShapes": "Clear All",
+    "cancelShape": "Cancel",
+    "scatterCount": "Scatter Count",
+    "distribution": "Scatter",
+    "manualAdd": "Manual Add",
+    "creationMode": "Creation Mode",
+    "editingShape": "Editing Selected Shape",
+    "autoModeAdjustable": "Adjustable in Auto Mode",
+    "shapeColorHint": "Shape color controls the fill of scattered shapes on the color block side (main image shapes automatically follow the stripe/solid background color).",
+    "autoGenerate": "Auto Generate",
+    "manualClick": "Manual Click"
+  },
+  "overlay": {
+    "text": "Text",
+    "font": "Font",
+    "style": "Style",
+    "fontSize": "Font Size",
+    "fillColor": "Fill Color",
+    "strokeColor": "Stroke Color",
+    "usePhotoFill": "Use Photo Fill",
+    "placeholder": "Write something... (supports line breaks)",
+    "delete": "Delete",
+    "deleteSelected": "Delete Selected Shape"
+  },
+  "background": {
+    "layout": "Layout",
+    "colorRatio": "Color Ratio",
+    "bgType": "Background Type",
+    "color": "Color",
+    "gradient": "Gradient",
+    "gradientType": "Gradient Type",
+    "texture": "Texture",
+    "animation": "Animation",
+    "position": "Position",
+    "stripeWidth": "Stripe Width",
+    "patternDensity": "Pattern Density",
+    "gradientAngle": "Gradient Angle",
+    "bgImage": "Background Image",
+    "changeImage": "Change Image",
+    "uploadImage": "Upload Image"
+  },
   "stats": {
     "title": "Data Analysis",
     "visits": "Visits",
@@ -20,6 +73,7 @@
     "sessions": "Sessions",
     "avgSession": "Avg Session",
     "noData": "No data yet",
+    "behaviorFunnel": "Behavior Funnel",
     "resetConfirm": "Are you sure you want to clear all stats? This cannot be undone.",
     "clearStats": "Clear Statistics",
     "lastVisit": "Last visit",
@@ -44,14 +98,18 @@
     "snowflake": "Snowflake",
     "heart": "Heart",
     "symbol": "Symbol",
-    "randomLetters": "Random Letters"
+    "randomLetters": "Random Letters",
+    "random": "Random"
   },
   "animations": {
     "pulse": "Pulse",
     "batch": "Batch",
     "rain": "Rainy Walk",
     "stars": "Starry Sky",
-    "rainfall": "Slow Rain"
+    "rainfall": "Slow Rain",
+    "template": "Animation Template",
+    "moreTemplates": "More Templates",
+    "comingSoon": "Coming Soon"
   },
   "compositions": {
     "block-bottom": "Block Bottom",
@@ -114,6 +172,10 @@
     "generating": "Generating...",
     "download": "Download"
   },
+  "video": {
+    "ready": "Video Ready",
+    "exportSuccess": "Export Success!"
+  },
   "text": {
     "addText": "Add Text",
     "placeholder": "Enter text...",
@@ -125,7 +187,14 @@
     "uploadFailed": "Upload failed, please retry",
     "exportFailed": "Export failed, please retry",
     "apiKeyMissing": "API Key not configured",
-    "networkError": "Network error"
+    "networkError": "Network error",
+    "pickingColor": "Click on the image to pick a color..."
+  },
+  "common": {
+    "on": "On",
+    "off": "Off",
+    "regenerate": "Regenerate",
+    "clear": "Clear"
   },
   "languages": {
     "zh": "简体中文",
@@ -156,5 +225,74 @@
     "mostProductiveDay": "Most Active Day",
     "topCombination": "Top Combination",
     "exportRatio": "Export Ratio"
+  },
+  "fonts": {
+    "Special Elite": "Special Elite",
+    "Huiwen-mincho": "Huiwen-mincho",
+    "Noto Sans SC": "Noto Sans SC",
+    "Noto Serif SC": "Noto Serif SC",
+    "Noto Sans JP": "Noto Sans JP",
+    "Noto Serif JP": "Noto Serif JP",
+    "Noto Sans KR": "Noto Sans KR",
+    "Ma Shan Zheng": "Ma Shan Zheng",
+    "ZCOOL XiaoWei": "ZCOOL XiaoWei",
+    "ZCOOL QingKe HuangYou": "ZCOOL QingKe HuangYou",
+    "Long Cang": "Long Cang",
+    "Liu Jian Mao Cao": "Liu Jian Mao Cao",
+    "Yi Shi Jiti": "Yi Shi Jiti",
+    "Homemade Apple": "Homemade Apple",
+    "Cinzel": "Cinzel",
+    "Oswald": "Oswald",
+    "Bebas Neue": "Bebas Neue",
+    "Anton": "Anton",
+    "Playfair Display": "Playfair Display",
+    "Permanent Marker": "Permanent Marker",
+    "Press Start 2P": "Press Start 2P",
+    "Righteous": "Righteous",
+    "Dancing Script": "Dancing Script",
+    "Satisfy": "Satisfy",
+    "Great Vibes": "Great Vibes",
+    "Monoton": "Monoton",
+    "Russo One": "Russo One",
+    "Bungee": "Bungee",
+    "Black Ops One": "Black Ops One",
+    "Staatliches": "Staatliches",
+    "Abril Fatface": "Abril Fatface",
+    "Alfa Slab One": "Alfa Slab One",
+    "Paytone One": "Paytone One",
+    "Syncopate": "Syncopate",
+    "Poiret One": "Poiret One",
+    "Comfortaa": "Comfortaa",
+    "Yeseva One": "Yeseva One",
+    "Lobster": "Lobster",
+    "Orbitron": "Orbitron",
+    "Acme": "Acme",
+    "Boogaloo": "Boogaloo",
+    "Fredoka One": "Fredoka One",
+    "Lilita One": "Lilita One",
+    "Big Shoulders Display": "Big Shoulders Display",
+    "Arvo": "Arvo",
+    "Lato": "Lato",
+    "Rajdhani": "Rajdhani",
+    "Rubik Mono One": "Rubik Mono One",
+    "Rubik Bubbles": "Rubik Bubbles",
+    "Shojumaru": "Shojumaru",
+    "Bungee Inline": "Bungee Inline",
+    "Spirax": "Spirax",
+    "Knewave": "Knewave",
+    "recommended": "Recommended for Chinese",
+    "recommendedJA": "Recommended for Japanese",
+    "recommendedKO": "Recommended for Korean"
+  },
+  "retention": {
+    "day1": "Day 1",
+    "day3": "Day 3",
+    "day7": "Day 7",
+    "day30": "Day 30"
+  },
+  "device": {
+    "mobile": "Mobile",
+    "tablet": "Tablet",
+    "desktop": "Desktop"
   }
 }

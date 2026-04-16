@@ -57,7 +57,7 @@ import type { LucideIcon } from 'lucide-react';
 
 // --- Types & Constants ---
 
-type BottomNavTab = 'background' | 'elements' | 'video' | 'stats';
+type BottomNavTab = 'background' | 'elements' | 'video';
 
 type AnimationType = 'pulse' | 'batch' | 'rain' | 'stars' | 'none';
 
@@ -131,69 +131,72 @@ interface Cutout {
 }
 
 /** 画布叠字字体预设（已在 index.html 中加载） */
-const TEXT_FONT_PRESETS: { value: string; label: string; badge?: string }[] = [
-  { value: '"Special Elite", cursive', label: 'Special Elite' },
-  { value: '"Huiwen-mincho", serif', label: '汇文明朝体', badge: '中文推荐' },
-  { value: '"Noto Sans SC", sans-serif', label: '黑体' },
-  { value: '"Noto Serif SC", serif', label: '宋体' },
-  { value: '"Ma Shan Zheng", cursive', label: '马善政楷体' },
-  { value: '"ZCOOL XiaoWei", sans-serif', label: '站酷小薇体' },
-  { value: '"ZCOOL QingKe HuangYou", cursive', label: '站酷庆科黄油' },
-  { value: '"Long Cang", cursive', label: '龙藏碑' },
-  { value: '"Liu Jian Mao Cao", cursive', label: '站酷快乐体' },
-  { value: '"Yi Shi Jiti", cursive', label: '意识体' },
-  { value: '"Homemade Apple", cursive', label: 'Homemade' },
-  { value: '"Cinzel", serif', label: 'Cinzel' },
-  { value: '"Oswald", sans-serif', label: 'Oswald' },
-  { value: '"Bebas Neue", sans-serif', label: 'Bebas' },
-  { value: '"Anton", sans-serif', label: 'Anton' },
-  { value: '"Playfair Display", serif', label: 'Playfair' },
-  { value: '"Permanent Marker", cursive', label: '手写' },
-  { value: '"Press Start 2P", cursive', label: '像素' },
-  { value: '"Righteous", sans-serif', label: 'Righteous' },
-  { value: '"Dancing Script", cursive', label: 'Dancing' },
-  { value: '"Satisfy", cursive', label: 'Satisfy' },
-  { value: '"Great Vibes", cursive', label: 'Great Vibes' },
-  { value: '"Monoton", cursive', label: 'Monoton' },
-  { value: '"Russo One", sans-serif', label: 'Russo' },
-  { value: '"Bungee", cursive', label: 'Bungee' },
-  { value: '"Black Ops One", cursive', label: 'Black Ops' },
-  { value: '"Staatliches", cursive', label: 'Staatliches' },
-  { value: '"Abril Fatface", cursive', label: 'Abril' },
-  { value: '"Alfa Slab One", cursive', label: 'Alfa Slab' },
-  { value: '"Paytone One", sans-serif', label: 'Paytone' },
-  { value: '"Syncopate", sans-serif', label: 'Syncopate' },
-  { value: '"Poiret One", cursive', label: 'Poiret' },
-  { value: '"Comfortaa", cursive', label: 'Comfortaa' },
-  { value: '"Yeseva One", cursive', label: 'Yeseva' },
-  { value: '"Lobster", cursive', label: 'Lobster' },
-  { value: '"Orbitron", sans-serif', label: 'Orbitron' },
-  { value: '"Acme", sans-serif', label: 'Acme' },
-  { value: '"Boogaloo", cursive', label: 'Boogaloo' },
-  { value: '"Fredoka One", cursive', label: 'Fredoka' },
-  { value: '"Lilita One", cursive', label: 'Lilita One' },
-  { value: '"Big Shoulders Display", cursive', label: 'Big Shoulders' },
-  { value: '"Arvo", serif', label: 'Arvo' },
-  { value: '"Lato", sans-serif', label: 'Lato' },
-  { value: '"Rajdhani", sans-serif', label: 'Rajdhani' },
-  { value: '"Rubik Mono One", sans-serif', label: 'Rubik Mono' },
-  { value: '"Rubik Bubbles", cursive', label: 'Rubik Bubbles' },
-  { value: '"Shojumaru", cursive', label: 'Shojumaru' },
-  { value: '"Bungee Inline", cursive', label: 'Bungee Inline' },
-  { value: '"Spirax", cursive', label: 'Spirax' },
-  { value: '"Knewave", cursive', label: 'Knewave' },
+const TEXT_FONT_PRESETS: { value: string; fontKey: string; badgeKey?: string }[] = [
+  { value: '"Special Elite", cursive', fontKey: 'fonts.Special Elite' },
+  { value: '"Huiwen-mincho", serif', fontKey: 'fonts.Huiwen-mincho', badgeKey: 'fonts.recommended' },
+  { value: '"Noto Sans JP", sans-serif', fontKey: 'fonts.Noto Sans JP', badgeKey: 'fonts.recommendedJA' },
+  { value: '"Noto Serif JP", serif', fontKey: 'fonts.Noto Serif JP', badgeKey: 'fonts.recommendedJA' },
+  { value: '"Noto Sans KR", sans-serif', fontKey: 'fonts.Noto Sans KR', badgeKey: 'fonts.recommendedKO' },
+  { value: '"Noto Sans SC", sans-serif', fontKey: 'fonts.Noto Sans SC' },
+  { value: '"Noto Serif SC", serif', fontKey: 'fonts.Noto Serif SC' },
+  { value: '"Ma Shan Zheng", cursive', fontKey: 'fonts.Ma Shan Zheng' },
+  { value: '"ZCOOL XiaoWei", sans-serif', fontKey: 'fonts.ZCOOL XiaoWei' },
+  { value: '"ZCOOL QingKe HuangYou", cursive', fontKey: 'fonts.ZCOOL QingKe HuangYou' },
+  { value: '"Long Cang", cursive', fontKey: 'fonts.Long Cang' },
+  { value: '"Liu Jian Mao Cao", cursive', fontKey: 'fonts.Liu Jian Mao Cao' },
+  { value: '"Yi Shi Jiti", cursive', fontKey: 'fonts.Yi Shi Jiti' },
+  { value: '"Homemade Apple", cursive', fontKey: 'fonts.Homemade Apple' },
+  { value: '"Cinzel", serif', fontKey: 'fonts.Cinzel' },
+  { value: '"Oswald", sans-serif', fontKey: 'fonts.Oswald' },
+  { value: '"Bebas Neue", sans-serif', fontKey: 'fonts.Bebas Neue' },
+  { value: '"Anton", sans-serif', fontKey: 'fonts.Anton' },
+  { value: '"Playfair Display", serif', fontKey: 'fonts.Playfair Display' },
+  { value: '"Permanent Marker", cursive', fontKey: 'fonts.Permanent Marker' },
+  { value: '"Press Start 2P", cursive', fontKey: 'fonts.Press Start 2P' },
+  { value: '"Righteous", sans-serif', fontKey: 'fonts.Righteous' },
+  { value: '"Dancing Script", cursive', fontKey: 'fonts.Dancing Script' },
+  { value: '"Satisfy", cursive', fontKey: 'fonts.Satisfy' },
+  { value: '"Great Vibes", cursive', fontKey: 'fonts.Great Vibes' },
+  { value: '"Monoton", cursive', fontKey: 'fonts.Monoton' },
+  { value: '"Russo One", sans-serif', fontKey: 'fonts.Russo One' },
+  { value: '"Bungee", cursive', fontKey: 'fonts.Bungee' },
+  { value: '"Black Ops One", cursive', fontKey: 'fonts.Black Ops One' },
+  { value: '"Staatliches", cursive', fontKey: 'fonts.Staatliches' },
+  { value: '"Abril Fatface", cursive', fontKey: 'fonts.Abril Fatface' },
+  { value: '"Alfa Slab One", cursive', fontKey: 'fonts.Alfa Slab One' },
+  { value: '"Paytone One", sans-serif', fontKey: 'fonts.Paytone One' },
+  { value: '"Syncopate", sans-serif', fontKey: 'fonts.Syncopate' },
+  { value: '"Poiret One", cursive', fontKey: 'fonts.Poiret One' },
+  { value: '"Comfortaa", cursive', fontKey: 'fonts.Comfortaa' },
+  { value: '"Yeseva One", cursive', fontKey: 'fonts.Yeseva One' },
+  { value: '"Lobster", cursive', fontKey: 'fonts.Lobster' },
+  { value: '"Orbitron", sans-serif', fontKey: 'fonts.Orbitron' },
+  { value: '"Acme", sans-serif', fontKey: 'fonts.Acme' },
+  { value: '"Boogaloo", cursive', fontKey: 'fonts.Boogaloo' },
+  { value: '"Fredoka One", cursive', fontKey: 'fonts.Fredoka One' },
+  { value: '"Lilita One", cursive', fontKey: 'fonts.Lilita One' },
+  { value: '"Big Shoulders Display", cursive', fontKey: 'fonts.Big Shoulders Display' },
+  { value: '"Arvo", serif', fontKey: 'fonts.Arvo' },
+  { value: '"Lato", sans-serif', fontKey: 'fonts.Lato' },
+  { value: '"Rajdhani", sans-serif', fontKey: 'fonts.Rajdhani' },
+  { value: '"Rubik Mono One", sans-serif', fontKey: 'fonts.Rubik Mono One' },
+  { value: '"Rubik Bubbles", cursive', fontKey: 'fonts.Rubik Bubbles' },
+  { value: '"Shojumaru", cursive', fontKey: 'fonts.Shojumaru' },
+  { value: '"Bungee Inline", cursive', fontKey: 'fonts.Bungee Inline' },
+  { value: '"Spirax", cursive', fontKey: 'fonts.Spirax' },
+  { value: '"Knewave", cursive', fontKey: 'fonts.Knewave' },
 ];
 
-const SHAPE_OPTIONS: { value: ShapeKind; icon: LucideIcon; title: string; caption: string }[] = [
-  { value: 'circle', icon: Circle, title: '圆形', caption: '圆形' },
-  { value: 'square', icon: Square, title: '正方形', caption: '正方形' },
-  { value: 'star', icon: Star, title: '五角星', caption: '五角星' },
-  { value: 'drop', icon: Droplet, title: '水滴', caption: '水滴' },
-  { value: 'snowflake', icon: Snowflake, title: '雪花', caption: '雪花' },
-  { value: 'heart', icon: Heart, title: '爱心', caption: '爱心' },
-  { value: 'randomLetters', icon: Dices, title: '随机字母', caption: '随机字母' },
-  { value: 'random', icon: Shuffle, title: '随机', caption: '随机形状' },
-  { value: 'symbol', icon: Plus, title: '自定义符号', caption: '自定义' },
+const SHAPE_OPTIONS: { value: ShapeKind; icon: LucideIcon; key: string }[] = [
+  { value: 'circle', icon: Circle, key: 'shapeKinds.circle' },
+  { value: 'square', icon: Square, key: 'shapeKinds.square' },
+  { value: 'star', icon: Star, key: 'shapeKinds.star' },
+  { value: 'drop', icon: Droplet, key: 'shapeKinds.drop' },
+  { value: 'snowflake', icon: Snowflake, key: 'shapeKinds.snowflake' },
+  { value: 'heart', icon: Heart, key: 'shapeKinds.heart' },
+  { value: 'randomLetters', icon: Dices, key: 'shapeKinds.randomLetters' },
+  { value: 'random', icon: Shuffle, key: 'shapeKinds.random' },
+  { value: 'symbol', icon: Plus, key: 'shapeKinds.symbol' },
 ];
 
 function pickRandomSymbolChar(s: string): string {
@@ -1533,11 +1536,11 @@ function drawCutoutsWithPhotoReveal(
   });
 }
 
-const COMPOSITIONS: { value: CompositionMode; label: string; icon: React.FC<{ size?: number; strokeWidth?: number }> }[] = [
-  { value: 'block-bottom', label: '色块在下方', icon: AlignEndHorizontal },
-  { value: 'block-top', label: '色块在上方', icon: AlignStartHorizontal },
-  { value: 'block-left', label: '色块在左侧', icon: AlignStartVertical },
-  { value: 'block-right', label: '色块在右侧', icon: AlignEndVertical },
+const COMPOSITIONS: { value: CompositionMode; key: string; icon: React.FC<{ size?: number; strokeWidth?: number }> }[] = [
+  { value: 'block-bottom', key: 'compositions.block-bottom', icon: AlignEndHorizontal },
+  { value: 'block-top', key: 'compositions.block-top', icon: AlignStartHorizontal },
+  { value: 'block-left', key: 'compositions.block-left', icon: AlignStartVertical },
+  { value: 'block-right', key: 'compositions.block-right', icon: AlignEndVertical },
 ];
 
 // --- Main Application ---
@@ -1562,7 +1565,7 @@ function TemplateButton({ label, icon, active, onClick, onDeselect }: { label: s
         <button
           onClick={(e) => { e.stopPropagation(); onDeselect(); }}
           className="absolute -top-2 -right-2 w-5 h-5 bg-gray-800 text-white rounded-full flex items-center justify-center text-[10px] font-black hover:bg-gray-900 transition-colors shadow-md"
-          title="取消使用模板"
+          title={t('stats.clearStats')}
         >
           <X size={10} strokeWidth={3} />
         </button>
@@ -2052,6 +2055,8 @@ export default function App() {
 
   const [isDraggingOverlay, setIsDraggingOverlay] = useState(false);
   const [isResizingOverlay, setIsResizingOverlay] = useState(false);
+  /** 是否显示叠字编辑框（默认不显示，点击文字时才显示） */
+  const [overlayEditing, setOverlayEditing] = useState(false);
   const overlayDragStartRef = useRef({ mouseX: 0, mouseY: 0, ox: 0, oy: 0 });
   const overlayResizeStartRef = useRef({ mouseY: 0, fontSize: 0 });
 
@@ -2958,6 +2963,8 @@ export default function App() {
   const handleOverlayMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!blockCanvasRef.current || !image || !overlayTextConfig.content.trim()) return;
     e.stopPropagation();
+    // 点击文字区域时，开启编辑模式
+    setOverlayEditing(true);
     const bel = blockCanvasRef.current;
     const cx = overlayTextConfig.x * bel.width;
     const cy = overlayTextConfig.y * bel.height;
@@ -3585,7 +3592,7 @@ export default function App() {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[10px] font-black text-gray-900 uppercase tracking-wider">正在编辑选中形状</span>
+            <span className="text-[10px] font-black text-gray-900 uppercase tracking-wider">{t('elements.editingShape')}</span>
           </div>
           <button
             type="button"
@@ -3599,7 +3606,7 @@ export default function App() {
         <div className="grid grid-cols-1 gap-3">
           <div className="space-y-2">
             <div className="flex justify-between items-end">
-              <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">大小缩放</label>
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">{t('elements.shapeSize')}</label>
               <span className="text-[9px] font-mono font-bold text-gray-900">
                 {Math.round((0.5 + (cutouts.find((c) => c.id === selectedId)?.sizeFactor || 0)) * 100)}%
               </span>
@@ -3622,7 +3629,7 @@ export default function App() {
 
           <div className="space-y-2">
             <div className="flex justify-between items-end">
-              <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">旋转角度</label>
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">{t('elements.shapeAdjust')}</label>
               <span className="text-[9px] font-mono font-bold text-gray-900">
                 {Math.round((((cutouts.find((c) => c.id === selectedId)?.angle || 0) * 180) / Math.PI) % 360)}°
               </span>
@@ -3660,7 +3667,7 @@ export default function App() {
           }`}
         >
           <Type size={15} strokeWidth={2.25} className="shrink-0 opacity-90" aria-hidden />
-          字体
+          {t('overlay.font')}
         </button>
         <button
           type="button"
@@ -3672,7 +3679,7 @@ export default function App() {
           }`}
         >
           <SlidersHorizontal size={15} strokeWidth={2.25} className="shrink-0 opacity-90" aria-hidden />
-          样式
+          {t('overlay.style')}
         </button>
       </div>
 
@@ -3691,10 +3698,10 @@ export default function App() {
               }`}
               style={{ fontFamily: f.value.replace(/"/g, '') }}
             >
-              {f.label}
-              {f.badge && (
+              {t(f.fontKey)}
+              {f.badgeKey && (
                 <span className="absolute -top-2 -right-2 px-1.5 py-0.5 text-[8px] font-black bg-amber-400 text-amber-900 rounded-full shadow-sm">
-                  {f.badge}
+                  {t(f.badgeKey)}
                 </span>
               )}
             </button>
@@ -3705,11 +3712,11 @@ export default function App() {
       {/* 样式 Tab：三列并列 — 标题 + 滑块/取色，无图标；点开「样式」即可直接调 */}
       {overlayPanelTab === 'style' && (
         <div className="space-y-3">
-          <p className="text-[10px] font-black text-gray-400 tracking-[0.2em]">文字样式</p>
+          <p className="text-[10px] font-black text-gray-400 tracking-[0.2em]">{t('overlay.style')}</p>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-4">
             <div className="min-w-0 space-y-2">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] font-black text-gray-500">字号</span>
+                <span className="text-[10px] font-black text-gray-500">{t('overlay.fontSize')}</span>
                 <span className="text-[11px] font-mono font-bold tabular-nums text-gray-900">
                   {overlayTextConfig.fontSize}
                 </span>
@@ -3726,7 +3733,7 @@ export default function App() {
               />
             </div>
             <div className="min-w-0 space-y-2">
-              <span className="block text-[10px] font-black text-gray-500">字体颜色</span>
+              <span className="block text-[10px] font-black text-gray-500">{t('overlay.fillColor')}</span>
               <div
                 className="relative h-10 w-full overflow-hidden rounded-xl border border-gray-200 shadow-inner"
                 style={{ backgroundColor: overlayTextConfig.fillColor }}
@@ -3736,12 +3743,12 @@ export default function App() {
                   value={overlayTextConfig.fillColor}
                   onChange={(e) => setOverlayTextConfig((prev) => ({ ...prev, fillColor: e.target.value }))}
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  aria-label="字体颜色"
+                  aria-label={t('overlay.fillColor')}
                 />
               </div>
             </div>
             <div className="min-w-0 space-y-2">
-              <span className="block text-[10px] font-black text-gray-500">描边</span>
+              <span className="block text-[10px] font-black text-gray-500">{t('overlay.strokeColor')}</span>
               <div
                 className="relative h-10 w-full overflow-hidden rounded-xl border border-gray-200 shadow-inner"
                 style={{ backgroundColor: overlayTextConfig.strokeColor }}
@@ -3751,14 +3758,14 @@ export default function App() {
                   value={overlayTextConfig.strokeColor}
                   onChange={(e) => setOverlayTextConfig((prev) => ({ ...prev, strokeColor: e.target.value }))}
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  aria-label="描边颜色"
+                  aria-label={t('overlay.strokeColor')}
                 />
               </div>
             </div>
           </div>
           {/* 图片填充开关 */}
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black text-gray-500">图片填充</span>
+            <span className="text-[10px] font-black text-gray-500">{t('overlay.usePhotoFill')}</span>
             <button
               type="button"
               onClick={() => setOverlayTextConfig((prev) => ({ ...prev, usePhotoFill: !prev.usePhotoFill }))}
@@ -3783,7 +3790,7 @@ export default function App() {
       <div className="grid grid-cols-1 gap-6">
         <div className="space-y-3">
           <div className="flex justify-between items-end">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">基础大小</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('elements.shapeSize')}</label>
             <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.baseSize}</span>
           </div>
           <input
@@ -3798,7 +3805,7 @@ export default function App() {
 
         <div className="space-y-3">
           <div className="flex justify-between items-end">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">随机差异</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('elements.shapeVariation')}</label>
             <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.variation}</span>
           </div>
           <input
@@ -3814,7 +3821,7 @@ export default function App() {
 
         <div className="space-y-3">
           <div className="flex justify-between items-end">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">每槽散落数量</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('elements.scatterCount')}</label>
             <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.scatterCount}</span>
           </div>
           <input
@@ -3831,7 +3838,7 @@ export default function App() {
 
         <div className={`space-y-3 ${cutoutConfig.creationMode === 'manual' ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="flex justify-between items-end">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">形状数量</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('elements.shapeCount')}</label>
             <span className="text-[10px] font-mono font-bold text-gray-900">{cutoutConfig.autoCount}</span>
           </div>
           <input
@@ -3850,13 +3857,13 @@ export default function App() {
             className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
           />
           {cutoutConfig.creationMode === 'manual' && (
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">自动模式下可调</p>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{t('elements.autoModeAdjustable')}</p>
           )}
         </div>
       </div>
 
       <div className="space-y-3 pt-2">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">形状颜色</label>
+        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('elements.shapeColor')}</label>
         <div
           className="relative h-11 rounded-2xl overflow-hidden border border-gray-100 shadow-sm"
           style={{ backgroundColor: cutoutConfig.shapeColor }}
@@ -3869,12 +3876,12 @@ export default function App() {
           />
         </div>
         <p className="text-[9px] text-gray-400 font-bold leading-snug">
-          形状颜色控制色块侧散落形状群内部的填色（主图形状颜色自动跟随条纹/纯色底色）。
+          {t('elements.shapeColorHint')}
         </p>
       </div>
 
       <div className="space-y-4 pt-4 border-t border-gray-50">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">分布模式</label>
+        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('elements.shapeDistribution')}</label>
         <div className="flex p-1 bg-gray-100 rounded-2xl">
           {(['sync', 'scatter'] as DistributionMode[]).map((mode) => (
             <button
@@ -3887,14 +3894,14 @@ export default function App() {
                   : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              {mode === 'sync' ? '对称' : '打散'}
+              {mode === 'sync' ? t('distributions.gather') : t('elements.distribution')}
             </button>
           ))}
         </div>
       </div>
 
       <div className="space-y-4 pt-4 border-t border-gray-50">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">生成方式</label>
+        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('elements.creationMode')}</label>
         <div className="flex p-1 bg-gray-100 rounded-2xl">
           {(['auto', 'manual'] as CreationMode[]).map((mode) => (
             <button
@@ -3908,7 +3915,7 @@ export default function App() {
                 cutoutConfig.creationMode === mode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              {mode === 'auto' ? '自动生成' : '手动点击'}
+              {mode === 'auto' ? t('elements.autoGenerate') : t('elements.manualClick')}
             </button>
           ))}
         </div>
@@ -3921,7 +3928,7 @@ export default function App() {
           className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 text-white py-3 rounded-xl transition-all text-[11px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95"
         >
           <RefreshCw size={14} />
-          <span>重新生成</span>
+          <span>{t('common.regenerate')}</span>
         </button>
         <button
           type="button"
@@ -3933,7 +3940,7 @@ export default function App() {
           className="flex-1 flex items-center justify-center gap-1.5 bg-gray-100 text-gray-600 py-3 rounded-xl transition-all text-[11px] font-black uppercase tracking-widest active:scale-95"
         >
           <Trash2 size={14} />
-          <span>清空形状</span>
+          <span>{t('common.clear')}</span>
         </button>
       </div>
 
@@ -3943,7 +3950,7 @@ export default function App() {
         className="w-full py-2.5 bg-gray-50 text-gray-400 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-gray-100 hover:text-gray-600 transition-all flex items-center justify-center gap-2"
       >
         <ChevronDown size={16} />
-        <span>收起设置面板</span>
+        <span>{t('common.collapse')}</span>
       </button>
     </>
   );
@@ -4044,7 +4051,7 @@ export default function App() {
   const renderStatBar = (usageKey: keyof typeof stats, labelMap?: Record<string, string>, maxItems: number = 5) => {
     const usage = stats[usageKey] as Record<string, number>;
     if (!usage || Object.keys(usage).length === 0) {
-      return <p className="text-[9px] text-gray-400 italic">暂无数据</p>;
+      return <p className="text-[9px] text-gray-400 italic">{t('stats.noData')}</p>;
     }
     const entries = Object.entries(usage)
       .sort((a, b) => b[1] - a[1])
@@ -4076,7 +4083,7 @@ export default function App() {
   // 渲染颜色使用热力条
   const renderColorBar = (usage: Record<string, number>, maxItems: number = 8) => {
     if (!usage || Object.keys(usage).length === 0) {
-      return <p className="text-[9px] text-gray-400 italic">暂无数据</p>;
+      return <p className="text-[9px] text-gray-400 italic">{t('stats.noData')}</p>;
     }
     const entries = Object.entries(usage)
       .sort((a, b) => b[1] - a[1])
@@ -4119,16 +4126,16 @@ export default function App() {
     const views = stats.visitCount;
 
     const funnelData = [
-      { label: '访问', value: views, color: 'bg-blue-400' },
-      { label: '上传', value: uploads, color: 'bg-emerald-400' },
-      { label: '导出', value: exports, color: 'bg-purple-400' },
+      { label: t('chart.views'), value: views, color: 'bg-blue-400' },
+      { label: t('chart.upload'), value: uploads, color: 'bg-emerald-400' },
+      { label: t('chart.export'), value: exports, color: 'bg-purple-400' },
     ];
 
     const maxVal = views || 1;
 
     return (
       <div className="space-y-2">
-        <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">行为漏斗</h4>
+        <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('stats.behaviorFunnel')}</h4>
         <div className="space-y-1.5">
           {funnelData.map((item, i) => {
             const width = Math.max((item.value / maxVal) * 100, 5);
@@ -4244,7 +4251,6 @@ export default function App() {
       <div className="flex justify-around items-center h-14 px-4">
         {renderTabButton('background', <Palette size={22} />, t('nav.background'))}
         {renderTabButton('elements', <Target size={22} />, t('nav.elements'))}
-        {renderTabButton('stats', <BarChart3 size={22} />, t('nav.stats'))}
         {renderTabButton('video', <Video size={22} />, t('nav.video'))}
       </div>
     </nav>
@@ -4258,7 +4264,7 @@ export default function App() {
         <button 
           onClick={() => setActiveTab(null)}
           className="absolute right-2 top-3 z-10 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800 sm:right-4 sm:top-4"
-          title="收起面板"
+          title={t('common.collapse')}
         >
           <X size={20} />
         </button>
@@ -4274,7 +4280,7 @@ export default function App() {
               {/* 版面：排版 + 色块占比 */}
               <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/50 p-3 pr-10">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">排版模式</label>
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{t('background.layout')}</label>
                   <div className="grid w-full grid-cols-4 gap-1.5">
                     {COMPOSITIONS.map((c) => {
                       const Icon = c.icon;
@@ -4291,7 +4297,7 @@ export default function App() {
                           }`}
                         >
                           <Icon size={16} strokeWidth={active ? 2.5 : 1.5} className="shrink-0" />
-                          <span className="line-clamp-2 text-center text-[7px] font-bold leading-tight">{c.label}</span>
+                          <span className="line-clamp-2 text-center text-[7px] font-bold leading-tight">{t(c.key)}</span>
                         </button>
                       );
                     })}
@@ -4299,7 +4305,7 @@ export default function App() {
                 </div>
                 <div className="space-y-2 border-t border-gray-100/80 pt-3">
                   <div className="flex justify-between items-end">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">色块占比</label>
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{t('background.colorRatio')}</label>
                     <span className="text-[10px] font-mono font-bold text-gray-900">{Math.round(blockAreaPercent)}%</span>
                   </div>
                   <input
@@ -4319,18 +4325,18 @@ export default function App() {
 
               {/* 底图：八选一 */}
               <div className="space-y-2 pr-10">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">底图类型</label>
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{t('background.bgType')}</label>
                 <div className="grid grid-cols-4 gap-2">
                   {(
                     [
-                      { type: 'solid' as const, label: '纯色' },
-                      { type: 'split' as const, label: '双拼色' },
-                      { type: 'gradient' as const, label: '渐变' },
-                      { type: 'image' as const, label: '图片' },
-                      { type: 'grid' as const, label: '笔记本' },
-                      { type: 'diagonal' as const, label: '格子' },
-                      { type: 'block' as const, label: '棋盘格' },
-                      { type: 'dots' as const, label: '点阵' },
+                      { type: 'solid' as const, label: t('bgTypes.solid') },
+                      { type: 'split' as const, label: t('bgTypes.split') },
+                      { type: 'gradient' as const, label: t('bgTypes.gradient') },
+                      { type: 'image' as const, label: t('bgTypes.image') },
+                      { type: 'grid' as const, label: t('bgTypes.grid') },
+                      { type: 'diagonal' as const, label: t('bgTypes.diagonal') },
+                      { type: 'block' as const, label: t('bgTypes.block') },
+                      { type: 'dots' as const, label: t('bgTypes.dots') },
                     ] as const
                   ).map(({ type, label }) => {
                     const active = bgConfig.type === type;
@@ -4355,15 +4361,15 @@ export default function App() {
               {/* 纹理选择 - 移到色彩配置上方 */}
               {bgConfig.type !== 'image' && (
                 <div className="space-y-2 pr-10">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">纹理</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('background.texture')}</label>
                   <div className="grid grid-cols-5 gap-1.5">
                     {(
                       [
-                        { type: 'none' as TextureType, label: '无' },
-                        { type: 'fine-paper' as TextureType, label: '像素风' },
-                        { type: 'fine-noise' as TextureType, label: '牛皮纸' },
-                        { type: 'grain-paper' as TextureType, label: '颗粒' },
-                        { type: 'coarse-paper' as TextureType, label: '砂纸' },
+                        { type: 'none' as TextureType, label: t('textures.none') },
+                        { type: 'fine-paper' as TextureType, label: t('textures.fine-paper') },
+                        { type: 'fine-noise' as TextureType, label: t('textures.fine-noise') },
+                        { type: 'grain-paper' as TextureType, label: t('textures.grain-paper') },
+                        { type: 'coarse-paper' as TextureType, label: t('textures.coarse-paper') },
                       ]
                     ).map(({ type, label }) => {
                       const active = bgConfig.texture === type;
@@ -4394,12 +4400,12 @@ export default function App() {
               {bgConfig.type !== 'image' && (
                 <div className="space-y-2 pr-10">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                    {bgConfig.type === 'solid' ? '背景颜色' : '色彩配置'}
+                    {bgConfig.type === 'solid' ? t('background.color') : t('background.color')}
                   </label>
                   <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0 space-y-0.5">
                       {bgConfig.type !== 'solid' && (
-                        <span className="text-[8px] font-black text-gray-400">颜色一</span>
+                        <span className="text-[8px] font-black text-gray-400">{t('background.color')} 1</span>
                       )}
                       <div className="group relative">
                         <div
@@ -4428,7 +4434,7 @@ export default function App() {
                     </div>
                     {(bgConfig.type === 'gradient' || bgConfig.type === 'split' || bgConfig.type === 'grid' || bgConfig.type === 'diagonal' || bgConfig.type === 'block' || bgConfig.type === 'dots') && (
                       <div className="flex-1 min-w-0 space-y-0.5">
-                        <span className="text-[8px] font-black text-gray-400">颜色二</span>
+                        <span className="text-[8px] font-black text-gray-400">{t('background.color')} 2</span>
                         <div className="group relative">
                           <div
                             className="w-full h-11 rounded-xl border border-gray-100 relative overflow-hidden shadow-inner"
@@ -4461,7 +4467,7 @@ export default function App() {
                   {bgConfig.type === 'gradient' && (
                     <div className="space-y-2">
                       <div className="flex justify-between items-end">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">渐变角度</label>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('background.gradientAngle')}</label>
                         <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.gradientAngle}°</span>
                       </div>
                       <input
@@ -4477,7 +4483,7 @@ export default function App() {
 
                   {pickingTarget && (
                     <p className="text-[9px] text-center text-black font-black animate-pulse uppercase tracking-widest">
-                      请点击画面中的位置进行取色...
+                      {t('errors.pickingColor')}
                     </p>
                   )}
                 </div>
@@ -4486,7 +4492,7 @@ export default function App() {
               {bgConfig.type === 'split' && (
                 <div className="space-y-2 pr-10">
                   <div className="flex justify-between items-end">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">条纹宽度</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('background.stripeWidth')}</label>
                     <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.stripeSize}px</span>
                   </div>
                   <input
@@ -4504,7 +4510,7 @@ export default function App() {
               {(bgConfig.type === 'grid' || bgConfig.type === 'diagonal' || bgConfig.type === 'block' || bgConfig.type === 'dots') && (
                 <div className="space-y-2 pr-10">
                   <div className="flex justify-between items-end">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em">图案密度</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('background.patternDensity')}</label>
                     <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.stripeSize}px</span>
                   </div>
                   <input
@@ -4522,13 +4528,14 @@ export default function App() {
               {bgConfig.type === 'gradient' && (
                 <div className="space-y-2 pr-10">
                   <div className="flex justify-between items-end">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">渐变角度</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('background.gradientAngle')}</label>
                     <span className="text-[10px] font-mono font-bold text-gray-900">{bgConfig.gradientAngle}°</span>
                   </div>
                   <input
                     type="range"
                     min="0"
                     max="360"
+                    step="5"
                     value={bgConfig.gradientAngle}
                     onChange={(e) => setBgConfig((prev) => ({ ...prev, gradientAngle: Number(e.target.value) }))}
                     className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
@@ -4538,7 +4545,7 @@ export default function App() {
 
               {bgConfig.type === 'image' && (
                 <div className="space-y-2 pr-10">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">背景图片</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('background.bgImage')}</label>
                   <input
                     type="file"
                     accept="image/*"
@@ -4565,7 +4572,7 @@ export default function App() {
                     className="w-full py-2.5 px-4 rounded-2xl border border-gray-100 bg-white text-gray-700 text-xs font-black hover:border-gray-200 hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
                   >
                     <Upload size={16} />
-                    {bgConfig.bgImage ? '更换图片' : '上传图片'}
+                    {bgConfig.bgImage ? t('background.changeImage') : t('background.uploadImage')}
                   </button>
                 </div>
               )}
@@ -4587,8 +4594,8 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-2xl mr-11 sm:mr-12">
                   {(
                     [
-                      { tab: 'shape' as const, label: '形状' },
-                      { tab: 'overlay' as const, label: '叠字' },
+                      { tab: 'shape' as const, label: t('elements.shape') },
+                      { tab: 'overlay' as const, label: t('elements.overlay') },
                     ] as const
                   ).map(({ tab, label }) => (
                     <button
@@ -4610,19 +4617,20 @@ export default function App() {
                 {/* 形状类型：单行横向排列，可左右滑动 */}
                 {elementsPanelTab === 'shape' && (
                   <div className="pt-2 border-t border-gray-100/90">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">形状类型</label>
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">{t('elements.shapeType')}</label>
                     <div className="-mx-1 flex flex-nowrap items-start gap-2 overflow-x-auto overflow-y-visible px-1 pt-1.5 pb-1 sm:mx-0 sm:px-0">
-                      {SHAPE_OPTIONS.map(({ value, icon: ShapeIcon, title, caption }) => {
+                      {SHAPE_OPTIONS.map(({ value, icon: ShapeIcon, key }) => {
                         const selectedCutout = selectedId ? cutouts.find((c) => c.id === selectedId) : undefined;
                         let activeShapeKind: ShapeKind | null = cutoutConfig.defaultShapeKind;
                         if (selectedCutout) activeShapeKind = selectedCutout.shapeKind ?? null;
                         const active = activeShapeKind !== null && activeShapeKind === value;
+                        const shapeLabel = t(key);
                         return (
                           <div key={value} className="flex w-[3.25rem] min-w-[3.25rem] shrink-0 flex-col items-center gap-0.5">
                             <button
                               type="button"
-                              title={title}
-                              aria-label={title}
+                              title={shapeLabel}
+                              aria-label={shapeLabel}
                               onClick={() => {
                                 if (cutoutConfig.creationMode === 'auto') {
                                   if (value === 'symbol') {
@@ -4704,7 +4712,7 @@ export default function App() {
                                 active ? 'text-emerald-800' : 'text-gray-600'
                               }`}
                             >
-                              {caption}
+                              {shapeLabel}
                             </span>
                           </div>
                         );
@@ -4730,8 +4738,8 @@ export default function App() {
                             );
                           }}
                           className="flex-1 h-8 px-3 rounded-full border border-gray-200 text-xs font-black text-center focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none bg-white shadow-sm"
-                          placeholder="输入符号，如 ★♥●"
-                          aria-label="自定义符号池"
+                          placeholder={t('elements.symbolPlaceholder')}
+                          aria-label={t('elements.symbolPool')}
                         />
                       </div>
                     )}
@@ -4740,8 +4748,8 @@ export default function App() {
                     <div className="flex justify-end pt-1">
                       <button
                         type="button"
-                        title="取消形状"
-                        aria-label="取消形状"
+                        title={t('elements.cancelShape')}
+                        aria-label={t('elements.cancelShape')}
                         onClick={() => {
                           setCutouts([]);
                           setSelectedId(null);
@@ -4749,13 +4757,13 @@ export default function App() {
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-black hover:bg-red-50 hover:text-red-500 transition-all"
                       >
                         <Trash2 size={12} />
-                        <span>清空形状</span>
+                        <span>{t('elements.clearShapes')}</span>
                       </button>
                     </div>
 
                     {/* 形状调整：6个圆形控制按钮 */}
                     <div className="space-y-2 pt-2">
-                      <p className="text-[10px] font-black text-gray-400 tracking-[0.2em]">形状调整</p>
+                      <p className="text-[10px] font-black text-gray-400 tracking-[0.2em]">{t('elements.shapeAdjust')}</p>
                       <div className="flex items-start gap-1.5 overflow-x-auto px-1">
                         {/* 形状大小 */}
                         <div className={`flex w-[4rem] min-w-[4rem] shrink-0 flex-col items-center gap-1 ${cutoutConfig.creationMode === 'manual' ? 'opacity-40' : ''}`}>
@@ -4764,7 +4772,7 @@ export default function App() {
                             <Images size={13} strokeWidth={expandedSlider === 'baseSize' ? 2.2 : 1.65} />
                             <span className={`text-[9px] font-mono font-bold tabular-nums leading-none ${expandedSlider === 'baseSize' ? 'text-white' : 'text-gray-400'}`}>{cutoutConfig.baseSize}</span>
                           </button>
-                          <span className={`text-[7px] font-black leading-snug tracking-tight ${expandedSlider === 'baseSize' ? 'text-emerald-800' : 'text-gray-700'}`}>形状大小</span>
+                          <span className={`text-[7px] font-black leading-snug tracking-tight ${expandedSlider === 'baseSize' ? 'text-emerald-800' : 'text-gray-700'}`}>{t('elements.shapeSize')}</span>
                         </div>
 
                         {/* 形状数量 */}
@@ -4774,7 +4782,7 @@ export default function App() {
                             <ImageIcon size={13} strokeWidth={expandedSlider === 'autoCount' ? 2.2 : 1.65} />
                             <span className={`text-[9px] font-mono font-bold tabular-nums leading-none ${expandedSlider === 'autoCount' && cutoutConfig.creationMode !== 'manual' ? 'text-white' : 'text-gray-400'}`}>{cutoutConfig.autoCount}</span>
                           </button>
-                          <span className={`text-[7px] font-black leading-snug tracking-tight ${expandedSlider === 'autoCount' && cutoutConfig.creationMode !== 'manual' ? 'text-emerald-800' : 'text-gray-700'}`}>形状数量</span>
+                          <span className={`text-[7px] font-black leading-snug tracking-tight ${expandedSlider === 'autoCount' && cutoutConfig.creationMode !== 'manual' ? 'text-emerald-800' : 'text-gray-700'}`}>{t('elements.shapeCount')}</span>
                         </div>
 
                         {/* 随机差异 */}
@@ -4784,7 +4792,7 @@ export default function App() {
                             <Sun size={13} strokeWidth={expandedSlider === 'variation' ? 2.2 : 1.65} />
                             <span className={`text-[9px] font-mono font-bold tabular-nums leading-none ${expandedSlider === 'variation' ? 'text-white' : 'text-gray-400'}`}>{cutoutConfig.variation}</span>
                           </button>
-                          <span className={`text-[7px] font-black leading-snug tracking-tight ${expandedSlider === 'variation' ? 'text-emerald-800' : 'text-gray-700'}`}>随机差异</span>
+                          <span className={`text-[7px] font-black leading-snug tracking-tight ${expandedSlider === 'variation' ? 'text-emerald-800' : 'text-gray-700'}`}>{t('elements.shapeVariation')}</span>
                         </div>
 
                         {/* 元素打散 */}
@@ -4792,9 +4800,9 @@ export default function App() {
                           <button type="button" onClick={() => setCutoutConfig((prev) => ({ ...prev, distributionMode: prev.distributionMode === 'sync' ? 'scatter' : 'sync' }))}
                             className={`h-[3rem] w-[3rem] shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-full transition-all ${cutoutConfig.distributionMode === 'scatter' ? 'bg-emerald-700 text-white' : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'}`}>
                             <Sparkles size={13} strokeWidth={cutoutConfig.distributionMode === 'scatter' ? 2.2 : 1.65} />
-                            <span className={`text-[9px] font-mono font-bold leading-none ${cutoutConfig.distributionMode === 'scatter' ? 'text-white' : 'text-gray-400'}`}>{cutoutConfig.distributionMode === 'scatter' ? '开' : '关'}</span>
+                            <span className={`text-[9px] font-mono font-bold leading-none ${cutoutConfig.distributionMode === 'scatter' ? 'text-white' : 'text-gray-400'}`}>{cutoutConfig.distributionMode === 'scatter' ? t('common.on') : t('common.off')}</span>
                           </button>
-                          <span className={`text-[7px] font-black leading-snug tracking-tight ${cutoutConfig.distributionMode === 'scatter' ? 'text-emerald-800' : 'text-gray-700'}`}>元素打散</span>
+                          <span className={`text-[7px] font-black leading-snug tracking-tight ${cutoutConfig.distributionMode === 'scatter' ? 'text-emerald-800' : 'text-gray-700'}`}>{t('elements.distribution')}</span>
                         </div>
 
                         {/* 手动添加 */}
@@ -4802,9 +4810,9 @@ export default function App() {
                           <button type="button" onClick={() => { const next = cutoutConfig.creationMode === 'manual' ? 'auto' : 'manual'; setCutoutConfig((prev) => ({ ...prev, creationMode: next })); if (next === 'auto' && cutouts.length === 0) generateAutoCutouts(); }}
                             className={`h-[3rem] w-[3rem] shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-full transition-all ${cutoutConfig.creationMode === 'manual' ? 'bg-emerald-700 text-white' : 'bg-gray-50/90 text-gray-500 ring-1 ring-gray-100 hover:bg-gray-100/90'}`}>
                             <Triangle size={13} strokeWidth={cutoutConfig.creationMode === 'manual' ? 2.2 : 1.65} />
-                            <span className={`text-[9px] font-mono font-bold leading-none ${cutoutConfig.creationMode === 'manual' ? 'text-white' : 'text-gray-400'}`}>{cutoutConfig.creationMode === 'manual' ? '开' : '关'}</span>
+                            <span className={`text-[9px] font-mono font-bold leading-none ${cutoutConfig.creationMode === 'manual' ? 'text-white' : 'text-gray-400'}`}>{cutoutConfig.creationMode === 'manual' ? t('common.on') : t('common.off')}</span>
                           </button>
-                          <span className={`text-[7px] font-black leading-snug tracking-tight ${cutoutConfig.creationMode === 'manual' ? 'text-emerald-800' : 'text-gray-700'}`}>手动添加</span>
+                          <span className={`text-[7px] font-black leading-snug tracking-tight ${cutoutConfig.creationMode === 'manual' ? 'text-emerald-800' : 'text-gray-700'}`}>{t('elements.manualAdd')}</span>
                         </div>
                       </div>
 
@@ -4832,7 +4840,7 @@ export default function App() {
                     <div className="flex gap-2 pt-2">
                       <button type="button" onClick={generateAutoCutouts}
                         className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 text-white py-3 rounded-xl transition-all text-[11px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95">
-                        <RefreshCw size={14} /><span>重新生成</span>
+                        <RefreshCw size={14} /><span>{t('common.regenerate')}</span>
                       </button>
                     </div>
                   </div>
@@ -4847,9 +4855,9 @@ export default function App() {
                       }
                       rows={3}
                       className="w-full min-h-[5rem] px-4 py-3 rounded-2xl border border-gray-100 text-sm font-bold text-gray-900 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none bg-white shadow-sm resize-y"
-                      placeholder="写一句话…可换行"
+                      placeholder={t('overlay.placeholder')}
                     />
-                    {overlayTextConfig.content.trim() && elementOverlayTextPanel}
+                    {elementOverlayTextPanel}
                   </div>
                 )}
             </motion.div>
@@ -5007,10 +5015,10 @@ export default function App() {
                 <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('sections.retentionRate')}</h4>
                 <div className="grid grid-cols-4 gap-1">
                   {[
-                    { label: '次日', value: analytics.retentionData.day1, color: 'emerald' },
-                    { label: '3日', value: Math.round((analytics.retentionData.day7 + analytics.retentionData.day1) / 2), color: 'blue' },
-                    { label: '7日', value: analytics.retentionData.day7, color: 'purple' },
-                    { label: '30日', value: analytics.retentionData.day30, color: 'amber' },
+                    { label: t('retention.day1'), value: analytics.retentionData.day1, color: 'emerald' },
+                    { label: t('retention.day3'), value: Math.round((analytics.retentionData.day7 + analytics.retentionData.day1) / 2), color: 'blue' },
+                    { label: t('retention.day7'), value: analytics.retentionData.day7, color: 'purple' },
+                    { label: t('retention.day30'), value: analytics.retentionData.day30, color: 'amber' },
                   ].map(({ label, value, color }) => (
                     <div key={label} className={`rounded-lg border border-${color}-100 bg-${color}-50/50 p-2 text-center`}>
                       <div className={`text-sm font-black text-${color}-600`}>{value}%</div>
@@ -5026,9 +5034,9 @@ export default function App() {
                 <div className="flex gap-2 bg-gray-50/40 rounded-xl border border-gray-100 p-3">
                   {analytics.deviceStats.map((d) => {
                     const deviceLabels: Record<string, string> = {
-                      mobile: { zh: '📱 手机', zhTW: '📱 手機', en: '📱 Mobile', ko: '📱 모바일', ja: '📱 モバイル' }[locale] || '📱 Mobile',
-                      tablet: { zh: '平板', zhTW: '平板', en: 'Tablet', ko: '태블릿', ja: 'タブレット' }[locale] || 'Tablet',
-                      desktop: { zh: '💻 桌面', zhTW: '💻 桌面', en: '💻 Desktop', ko: '💻 데스크톱', ja: '💻 デスクトップ' }[locale] || '💻 Desktop',
+                      mobile: t('device.mobile'),
+                      tablet: t('device.tablet'),
+                      desktop: t('device.desktop'),
                     };
                     return (
                       <div key={d.device} className="flex-1 text-center">
@@ -5220,33 +5228,33 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="space-y-4"
             >
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">动画模板</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{t('animation.template')}</h3>
               
               {/* 动画模板选择 */}
               <div className="grid grid-cols-2 gap-3">
                 <TemplateButton 
-                  label="形状叠加" 
+                  label={t('animations.pulse')} 
                   icon={<Maximize className="w-4 h-4" />} 
                   active={activeAnimation === 'pulse'}
                   onClick={() => handleAnimationSelect('pulse')}
                   onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton 
-                  label="形状切换" 
+                  label={t('animations.batch')} 
                   icon={<Layers size={4} className="w-4 h-4" />} 
                   active={activeAnimation === 'batch'}
                   onClick={() => handleAnimationSelect('batch')}
                   onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton 
-                  label="漫步雨季" 
+                  label={t('animations.rain')} 
                   icon={<CloudRain className="w-4 h-4" />} 
                   active={activeAnimation === 'rain'}
                   onClick={() => handleAnimationSelect('rain')}
                   onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
                 />
                 <TemplateButton
-                  label="璀璨星河"
+                  label={t('animations.stars')}
                   icon={<Star className="w-4 h-4" />}
                   active={activeAnimation === 'stars'}
                   onClick={() => handleAnimationSelect('stars')}
@@ -5257,8 +5265,8 @@ export default function App() {
                     disabled
                     className="w-full py-3 px-3 rounded-xl border border-dashed border-gray-300 bg-gray-50/50 text-gray-400 flex flex-col items-center justify-center gap-1 opacity-60 cursor-not-allowed"
                   >
-                    <span className="text-[11px] font-bold">更多模板</span>
-                    <span className="text-[8px]">待开发</span>
+                    <span className="text-[11px] font-bold">{t('animation.moreTemplates')}</span>
+                    <span className="text-[8px]">{t('animation.comingSoon')}</span>
                   </button>
                 </div>
               </div>
@@ -5273,7 +5281,7 @@ export default function App() {
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                <Video size={16} /><span>导出视频</span>
+                <Video size={16} /><span>{t('export.video')}</span>
               </button>
             </motion.div>
           )}
@@ -5322,6 +5330,10 @@ export default function App() {
           ref={previewStageRef}
           className={`custom-scrollbar flex h-full w-full max-w-[100vw] flex-col items-center justify-center overflow-auto p-2 sm:p-4 md:p-12`}
           style={{ maxHeight: 'calc(100dvh - 7rem - env(safe-area-inset-top, 0px))' }}
+          onClick={() => {
+            // 点击空白区域时关闭叠字编辑框
+            if (overlayEditing) setOverlayEditing(false);
+          }}
         >
           {image && cutoutConfig.creationMode === 'manual' && (
             <motion.div 
@@ -5349,7 +5361,7 @@ export default function App() {
                     <Upload className="w-7 h-7 text-gray-400 group-hover:text-white" />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-black text-gray-900 uppercase tracking-widest">上传图片开始创作</p>
+                    <p className="text-sm font-black text-gray-900 uppercase tracking-widest">{t('upload.startCreating')}</p>
                     <p className="text-[9px] text-gray-400 font-bold uppercase tracking-[0.2em]">Support JPG, PNG, WEBP</p>
                   </div>
                 </button>
@@ -5494,8 +5506,8 @@ export default function App() {
                         />
                         <button
                           type="button"
-                          title="删除"
-                          aria-label="删除选中形状"
+                          title={t('overlay.delete')}
+                          aria-label={t('overlay.deleteSelected')}
                           onClick={(ev) => {
                             ev.stopPropagation();
                             deleteSelectedCutout();
@@ -5676,7 +5688,7 @@ export default function App() {
                     display: 'block',
                   }}
                 />
-                {overlayTextConfig.content.trim().length > 0 && !selectedId && (() => {
+                {overlayTextConfig.content.trim().length > 0 && overlayEditing && (() => {
                   const bel = blockCanvasRef.current;
                   let leftPct = overlayTextConfig.x * 100;
                   let topPct = overlayTextConfig.y * 100;
@@ -5690,7 +5702,7 @@ export default function App() {
                     }
                   }
                   return (
-                  <div className="absolute inset-0 pointer-events-none z-10 overflow-visible">
+                  <div className="absolute inset-0 pointer-events-none z-10 overflow-visible" onClick={(e) => e.stopPropagation()}>
                     <div
                       className="absolute pointer-events-auto"
                       onMouseDown={handleOverlayMouseDown}
@@ -5817,8 +5829,8 @@ export default function App() {
                 <Video className="text-emerald-600 w-10 h-10" />
               </div>
               <div>
-                <h3 className="font-black text-2xl text-gray-900">导出成功！</h3>
-                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">视频已准备就绪</p>
+                <h3 className="font-black text-2xl text-gray-900">{t('video.exportSuccess')}</h3>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">{t('video.ready')}</p>
               </div>
               <div className="space-y-3 pt-4">
                 <button
@@ -5857,7 +5869,7 @@ export default function App() {
                 <X className="text-red-500 w-8 h-8" />
               </div>
               <div>
-                <h3 className="font-black text-xl text-gray-900">导出失败</h3>
+                <h3 className="font-black text-xl text-gray-900">{t('errors.exportFailed')}</h3>
                 <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">{exportError}</p>
               </div>
               <button
