@@ -57,6 +57,7 @@
     "animation": "Animation",
     "position": "Position",
     "stripeWidth": "Stripe Width",
+    "stripeWidthHint": "Adjust color block 20%–80%; preview = export",
     "patternDensity": "Pattern Density",
     "gradientAngle": "Gradient Angle",
     "bgImage": "Background Image",
@@ -195,7 +196,8 @@
     "on": "On",
     "off": "Off",
     "regenerate": "Regenerate",
-    "clear": "Clear"
+    "clear": "Clear",
+    "collapse": "Collapse Settings"
   },
   "languages": {
     "zh": "简体中文",

@@ -178,6 +178,7 @@
     "animation": "動畫",
     "position": "位置",
     "stripeWidth": "條紋寬度",
+    "stripeWidthHint": "調色塊 20%–80%; 預覽=導出",
     "patternDensity": "圖案密度",
     "gradientAngle": "漸變角度",
     "bgImage": "背景圖片",

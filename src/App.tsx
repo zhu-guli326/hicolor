@@ -1553,7 +1553,7 @@ const COMPOSITIONS: { value: CompositionMode; key: string; icon: React.FC<{ size
 // --- Main Application ---
 
 // TemplateButton 组件
-function TemplateButton({ label, icon, active, onClick, onDeselect }: { label: string; icon: React.ReactNode; active: boolean; onClick: () => void; onDeselect?: () => void }) {
+function TemplateButton({ label, icon, active, onClick, onDeselect, t }: { label: string; icon: React.ReactNode; active: boolean; onClick: () => void; onDeselect?: () => void; t: (key: string) => string }) {
   return (
     <div className="relative">
       <button
@@ -1748,10 +1748,10 @@ export default function App() {
   // 1. Canvas Configuration
   const [composition, setComposition] = useState<CompositionMode>('block-bottom');
   const [zoom, setZoom] = useState(0.6);
-  /** 色块在「主图+色块」整条里所占比例，20%–100%（100% 内部按 99% 计算避免除零） */
+  /** 色块在「主图+色块」整条里所占比例，20%–80%（80% 内部按 79% 计算避免除零） */
   /** 主图预览始终一整格原图缩放；色块区为条带「裁剪」宽度/高度（占比仅改变条带，不挤压主图格） */
-  const [blockAreaPercent, setBlockAreaPercent] = useState(100);
-  const blockStripRatio = Math.min(0.99, Math.max(0.2, blockAreaPercent / 100));
+  const [blockAreaPercent, setBlockAreaPercent] = useState(80);
+  const blockStripRatio = Math.min(0.79, Math.max(0.2, blockAreaPercent / 100));
 
   useEffect(() => {
     setPickingTarget(null);
@@ -2395,6 +2395,9 @@ export default function App() {
     setExportPhase('record');
     setVideoBlobUrl(null);
 
+    // 临时启用动画播放状态，确保录制时能绘制动画效果
+    const previousIsPlaying = isPlaying;
+
     try {
       // 确保 FFmpeg 已加载
       if (!ffmpegRef.current) {
@@ -2403,8 +2406,6 @@ export default function App() {
         return;
       }
 
-      // 临时启用动画播放状态，确保录制时能绘制动画效果
-      const previousIsPlaying = isPlaying;
       setIsPlaying(true);
 
       // 等待一帧，确保动画状态生效
@@ -4401,14 +4402,14 @@ export default function App() {
                   <input
                     type="range"
                     min={20}
-                    max={100}
+                    max={80}
                     step={1}
                     value={blockAreaPercent}
                     onChange={(e) => setBlockAreaPercent(Number(e.target.value))}
                     className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
                   />
                   <p className="text-[8px] font-bold text-gray-400 leading-snug">
-                    仅改变条带区宽窄（相对一整格原图），主图预览尺寸不变；20%–100%，导出与预览一致
+                    {t('stripeWidthHint')}
                   </p>
                 </div>
               </div>
@@ -5328,6 +5329,7 @@ export default function App() {
                   active={activeAnimation === 'pulse'}
                   onClick={() => handleAnimationSelect('pulse')}
                   onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
+                  t={t}
                 />
                 <TemplateButton 
                   label={t('animations.batch')} 
@@ -5335,6 +5337,7 @@ export default function App() {
                   active={activeAnimation === 'batch'}
                   onClick={() => handleAnimationSelect('batch')}
                   onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
+                  t={t}
                 />
                 <TemplateButton 
                   label={t('animations.rain')} 
@@ -5342,6 +5345,7 @@ export default function App() {
                   active={activeAnimation === 'rain'}
                   onClick={() => handleAnimationSelect('rain')}
                   onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
+                  t={t}
                 />
                 <TemplateButton
                   label={t('animations.stars')}
@@ -5349,6 +5353,7 @@ export default function App() {
                   active={activeAnimation === 'stars'}
                   onClick={() => handleAnimationSelect('stars')}
                   onDeselect={() => { setActiveAnimation('none'); setIsPlaying(false); trackWithAnalytics({ type: 'stop_animation' }); }}
+                  t={t}
                 />
                 <div className="relative">
                   <button

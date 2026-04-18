@@ -178,6 +178,7 @@
     "animation": "애니메이션",
     "position": "위치",
     "stripeWidth": "스트라이프 폭",
+    "stripeWidthHint": "색 블록 조정 20%–80%; 프리뷰 = 내보내기",
     "patternDensity": "패턴 밀도",
     "gradientAngle": "그라데이션 각도",
     "bgImage": "배경 이미지",
