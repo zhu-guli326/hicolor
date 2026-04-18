@@ -155,7 +155,7 @@
     "size": "大小",
     "color": "颜色"
   },
-  "text": {
+  "overlay": {
     "text": "文字",
     "font": "字体",
     "style": "样式",

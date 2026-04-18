@@ -155,14 +155,14 @@
     "size": "サイズ",
     "color": "色"
   },
-  "text": {
+  "overlay": {
     "text": "テキスト",
     "font": "フォント",
     "style": "スタイル",
     "fontSize": "フォントサイズ",
     "fillColor": "塗りつぶし色",
     "strokeColor": "ストローク色",
-    "usePhotoFill": "写真塗りつぶし",
+    "usePhotoFill": "写真塗���つぶし",
     "placeholder": "テキストを入力...（改行可能）",
     "delete": "削除",
     "deleteSelected": "選択した形状を削除"
@@ -272,7 +272,7 @@
     "Boogaloo": "Boogaloo",
     "Fredoka One": "Fredoka One",
     "Lilita One": "Lilita One",
-    "Big Shoulders Display": "Big Shoulders Display",
+    "Big Shoulders Display": "Big Shoulders",
     "Arvo": "Arvo",
     "Lato": "Lato",
     "Rajdhani": "Rajdhani",

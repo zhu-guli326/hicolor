@@ -164,7 +164,8 @@
     "dropHint": "Release to upload",
     "processing": "AI processing...",
     "success": "Upload success",
-    "failed": "Upload failed"
+    "failed": "Upload failed",
+    "startCreating": "Upload to start creating"
   },
   "export": {
     "png": "Export PNG",

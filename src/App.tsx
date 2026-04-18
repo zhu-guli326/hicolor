@@ -2396,6 +2396,20 @@ export default function App() {
     setVideoBlobUrl(null);
 
     try {
+      // 确保 FFmpeg 已加载
+      if (!ffmpegRef.current) {
+        setExportError('FFmpeg 正在加载中，请稍后重试');
+        setIsExporting(false);
+        return;
+      }
+
+      // 临时启用动画播放状态，确保录制时能绘制动画效果
+      const previousIsPlaying = isPlaying;
+      setIsPlaying(true);
+
+      // 等待一帧，确保动画状态生效
+      await new Promise(resolve => requestAnimationFrame(resolve));
+
       // 直接使用主画布和色块画布的尺寸，不依赖 previewWrapRef
       const r = blockStripRatio;
       const { mainW, mainH, blockW, blockH, cropX, cropY, sw: cropW, sh: cropH } =
@@ -2462,11 +2476,26 @@ export default function App() {
 
       // 流 & 录制器
       const stream = canvas.captureStream(60);
+      
+      // 检查浏览器支持的视频格式
       const mimeTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
-      const supportedType = mimeTypes.find(t => {
-        try { return MediaRecorder.isTypeSupported(t); } catch { return false; }
-      }) || 'video/webm';
-      const isMp4 = supportedType.startsWith('video/mp4');
+      let supportedType = '';
+      for (const t of mimeTypes) {
+        try {
+          if (MediaRecorder.isTypeSupported(t)) {
+            supportedType = t;
+            console.log('Using video format:', t);
+            break;
+          }
+        } catch (e) {
+          console.warn('Format not supported:', t, e);
+        }
+      }
+      supportedType = supportedType || 'video/webm';
+      
+      console.log('Canvas size:', recW, 'x', recH);
+      console.log('Stream tracks:', stream.getTracks().length);
+      console.log('MediaRecorder supported:', supportedType);
 
       const recorder = new MediaRecorder(stream, {
         mimeType: supportedType,
@@ -2474,7 +2503,16 @@ export default function App() {
       });
 
       const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.ondataavailable = (e) => { 
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+          console.log('Data available:', e.data.size, 'bytes, type:', e.data.type);
+        }
+      };
+
+      recorder.onerror = (e) => {
+        console.error('MediaRecorder error:', e);
+      };
 
       recorder.onstop = async () => {
         // 用 chunks[0].type 动态判断原始录制格式
@@ -2485,6 +2523,7 @@ export default function App() {
         if (!ffmpegRef.current) {
           setExportError('FFmpeg 未加载，请稍后重试');
           setIsExporting(false);
+          setIsPlaying(previousIsPlaying);
           return;
         }
         const ffmpeg = ffmpegRef.current;
@@ -2532,6 +2571,8 @@ export default function App() {
           setIsExporting(false);
           setShowExportSuccess(true);
           trackWithAnalytics({ type: 'export_video' });
+          // 恢复之前的播放状态
+          setIsPlaying(previousIsPlaying);
         } catch (err) {
           console.error('FFmpeg 转码失败:', err);
           // 转码失败时降级：直接返回 webm
@@ -2543,6 +2584,8 @@ export default function App() {
           setIsExporting(false);
           setShowExportSuccess(true);
           trackWithAnalytics({ type: 'export_video' });
+          // 恢复之前的播放状态
+          setIsPlaying(previousIsPlaying);
         }
       };
 
@@ -2678,6 +2721,45 @@ export default function App() {
               ctx.restore();
             });
           }
+
+          // batch 形状切换动画
+          if (activeAnimation === 'batch' && isPlaying) {
+            const switchCycle = Math.floor(batchVal * 10); // 录制期间完成的切换次数
+            cutouts.slice(0, 8).forEach((c, index) => {
+              const size = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (mainW / 800) * 1.2;
+              const holeColor = sampleFromBlockData(c.x, c.y);
+              
+              // 使用 batchVal 和索引生成确定性但变化的随机值
+              const randomBase = switchCycle * 1000 + index * 137;
+              const shapeOptions = ['circle', 'square', 'star', 'drop', 'snowflake'];
+              const selectedShape = shapeOptions[randomBase % shapeOptions.length];
+              const randomAngle = (randomBase * 137.508) % (Math.PI * 2);
+              
+              // 位置偏移：随 switchCycle 和 index 产生周期性偏移
+              const posOffsetX = Math.sin(randomBase * 0.7) * size * 0.3;
+              const posOffsetY = Math.cos(randomBase * 0.5) * size * 0.3;
+              
+              ctx.save();
+              ctx.translate(c.x * mainW + posOffsetX, c.y * mainH + posOffsetY);
+              ctx.rotate(randomAngle);
+              ctx.fillStyle = holeColor;
+              
+              // 绘制随机形状
+              if (selectedShape === 'circle') {
+                ctx.beginPath();
+                ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+                ctx.fill();
+              } else if (selectedShape === 'square') {
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+              } else {
+                ctx.beginPath();
+                addShapePath(ctx, selectedShape as ShapeKind, size);
+                ctx.fill();
+              }
+              
+              ctx.restore();
+            });
+          }
         }
 
         recorder.requestData();
@@ -2698,6 +2780,7 @@ export default function App() {
       console.error('Export failed:', err);
       setExportError('视频合成失败，请重试');
       setIsExporting(false);
+      setIsPlaying(previousIsPlaying);
     }
   };
 
@@ -5235,7 +5318,7 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="space-y-4"
             >
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{t('animation.template')}</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{t('animations.template')}</h3>
               
               {/* 动画模板选择 */}
               <div className="grid grid-cols-2 gap-3">
@@ -5272,8 +5355,8 @@ export default function App() {
                     disabled
                     className="w-full py-3 px-3 rounded-xl border border-dashed border-gray-300 bg-gray-50/50 text-gray-400 flex flex-col items-center justify-center gap-1 opacity-60 cursor-not-allowed"
                   >
-                    <span className="text-[11px] font-bold">{t('animation.moreTemplates')}</span>
-                    <span className="text-[8px]">{t('animation.comingSoon')}</span>
+                    <span className="text-[11px] font-bold">{t('animations.moreTemplates')}</span>
+                    <span className="text-[8px]">{t('animations.comingSoon')}</span>
                   </button>
                 </div>
               </div>

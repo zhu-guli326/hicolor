@@ -116,7 +116,7 @@
     "textureRanking": "紋理效果 · 使用排行",
     "gradientRanking": "漸變類型 · 使用排行",
     "recentActivity": "最近活躍",
-    "efficiency": "效率指標",
+    "efficiency": "效率指���",
     "uploadRate": "上傳成功率",
     "exportRate": "導出成功率",
     "creationRate": "創作產出比",
@@ -155,7 +155,7 @@
     "size": "大小",
     "color": "顏色"
   },
-  "text": {
+  "overlay": {
     "text": "文字",
     "font": "字體",
     "style": "樣式",
@@ -238,7 +238,7 @@
     "Noto Sans KR": "Noto Sans KR",
     "Ma Shan Zheng": "Ma Shan Zheng",
     "ZCOOL XiaoWei": "ZCOOL XiaoWei",
-    "ZCOOL QingKe HuangYou": "ZCOOL QingKe HuangYou",
+    "ZCOOL QingKe HuangYou": "ZCOOL QingKe黄油",
     "Long Cang": "Long Cang",
     "Liu Jian Mao Cao": "Liu Jian Mao Cao",
     "Yi Shi Jiti": "Yi Shi Jiti",
@@ -272,7 +272,7 @@
     "Boogaloo": "Boogaloo",
     "Fredoka One": "Fredoka One",
     "Lilita One": "Lilita One",
-    "Big Shoulders Display": "Big Shoulders Display",
+    "Big Shoulders Display": "Big Shoulders",
     "Arvo": "Arvo",
     "Lato": "Lato",
     "Rajdhani": "Rajdhani",
