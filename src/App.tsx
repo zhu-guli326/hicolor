@@ -5889,50 +5889,6 @@ export default function App() {
                     display: 'block',
                   }}
                 />
-                {/* 细腻纸张：方向纤维 */}
-                {bgConfig.texture === 'fine-paper' && (
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      backgroundImage:
-                        'linear-gradient(105deg, rgba(255,255,255,0.14) 0, rgba(255,255,255,0.14) 1px, transparent 1px, transparent 6px), linear-gradient(15deg, rgba(0,0,0,0.035) 0, rgba(0,0,0,0.035) 1px, transparent 1px, transparent 9px)',
-                      backgroundSize: '8px 8px, 12px 12px',
-                    }}
-                  />
-                )}
-                {/* 细腻噪点：高频颗粒 */}
-                {bgConfig.texture === 'fine-noise' && (
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      backgroundImage:
-                        'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.18) 0.6px, transparent 0.7px), radial-gradient(circle at 2px 2px, rgba(0,0,0,0.12) 0.5px, transparent 0.6px)',
-                      backgroundSize: '3px 3px, 4px 4px',
-                    }}
-                  />
-                )}
-                {/* 颗粒纸张：中颗粒团块 */}
-                {bgConfig.texture === 'grain-paper' && (
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      backgroundImage:
-                        'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.12) 1.1px, transparent 1.2px), radial-gradient(circle at 4px 3px, rgba(0,0,0,0.08) 1px, transparent 1.1px)',
-                      backgroundSize: '6px 6px, 8px 8px',
-                    }}
-                  />
-                )}
-                {/* 粗砂纸：大颗粒粗糙感 */}
-                {bgConfig.texture === 'coarse-paper' && (
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      backgroundImage:
-                        'radial-gradient(circle at 3px 3px, rgba(0,0,0,0.13) 1.4px, transparent 1.5px), radial-gradient(circle at 7px 5px, rgba(255,255,255,0.12) 1.6px, transparent 1.7px)',
-                      backgroundSize: '10px 10px, 12px 12px',
-                    }}
-                  />
-                )}
                 {selectedId && (() => {
                   const c = cutouts.find((x) => x.id === selectedId);
                   if (!c) return null;
@@ -6181,6 +6137,47 @@ export default function App() {
                     display: 'block',
                   }}
                 />
+                {/* 纹理覆盖层只显示在色块区域，不覆盖原图 */}
+                {bgConfig.texture === 'fine-paper' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(105deg, rgba(255,255,255,0.14) 0, rgba(255,255,255,0.14) 1px, transparent 1px, transparent 6px), linear-gradient(15deg, rgba(0,0,0,0.035) 0, rgba(0,0,0,0.035) 1px, transparent 1px, transparent 9px)',
+                      backgroundSize: '8px 8px, 12px 12px',
+                    }}
+                  />
+                )}
+                {bgConfig.texture === 'fine-noise' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.18) 0.6px, transparent 0.7px), radial-gradient(circle at 2px 2px, rgba(0,0,0,0.12) 0.5px, transparent 0.6px)',
+                      backgroundSize: '3px 3px, 4px 4px',
+                    }}
+                  />
+                )}
+                {bgConfig.texture === 'grain-paper' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.12) 1.1px, transparent 1.2px), radial-gradient(circle at 4px 3px, rgba(0,0,0,0.08) 1px, transparent 1.1px)',
+                      backgroundSize: '6px 6px, 8px 8px',
+                    }}
+                  />
+                )}
+                {bgConfig.texture === 'coarse-paper' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        'radial-gradient(circle at 3px 3px, rgba(0,0,0,0.13) 1.4px, transparent 1.5px), radial-gradient(circle at 7px 5px, rgba(255,255,255,0.12) 1.6px, transparent 1.7px)',
+                      backgroundSize: '10px 10px, 12px 12px',
+                    }}
+                  />
+                )}
                 {overlayTextConfig.content.trim().length > 0 && overlayEditing && (() => {
                   const bel = blockCanvasRef.current;
                   let leftPct = overlayTextConfig.x * 100;
