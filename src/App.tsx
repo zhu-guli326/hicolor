@@ -746,6 +746,175 @@ function addShapePath(ctx: CanvasRenderingContext2D, kind: ShapeKind, size: numb
   }
 }
 
+type BatchBaseShape = 'circle' | 'square' | 'star' | 'heart' | 'drop' | 'snowflake';
+
+const BATCH_SHAPE_SEQUENCE: BatchBaseShape[] = ['circle', 'square', 'star', 'drop', 'snowflake', 'heart'];
+const BATCH_SWITCHES_PER_SECOND = 2.8;
+const BATCH_FRAME_MS = 1000 / 30;
+const BATCH_PROGRESS_STEP = (BATCH_FRAME_MS / 1000) * BATCH_SWITCHES_PER_SECOND;
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function getBatchShapeSignature(step: number, index: number) {
+  const seed = step * 97 + index * 37;
+  const normalizedIndex = ((seed % BATCH_SHAPE_SEQUENCE.length) + BATCH_SHAPE_SEQUENCE.length) % BATCH_SHAPE_SEQUENCE.length;
+  return {
+    shape: BATCH_SHAPE_SEQUENCE[normalizedIndex],
+    angle: ((seed * 23.417) % 360) * (Math.PI / 180),
+    offsetX: Math.sin(seed * 0.61) * 0.72,
+    offsetY: Math.cos(seed * 0.47) * 0.72,
+  };
+}
+
+function drawBatchMorphShape(
+  ctx: CanvasRenderingContext2D,
+  shape: BatchBaseShape,
+  size: number
+) {
+  if (shape === 'circle') {
+    ctx.beginPath();
+    ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  if (shape === 'square') {
+    ctx.fillRect(-size / 2, -size / 2, size, size);
+    return;
+  }
+
+  ctx.beginPath();
+  addShapePath(ctx, shape, size);
+  ctx.fill();
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getBatchSceneVisibleCutouts(cutouts: Cutout[], sceneStep: number) {
+  if (cutouts.length === 0) return [];
+
+  const maxCount = Math.min(12, cutouts.length);
+  const minCount = Math.min(4, maxCount);
+  const span = Math.max(1, maxCount - minCount + 1);
+  const visibleCount = minCount + (((sceneStep * 3) % span) + span) % span;
+  const startIndex = (((sceneStep * 2) % cutouts.length) + cutouts.length) % cutouts.length;
+
+  return Array.from({ length: visibleCount }, (_, i) => cutouts[(startIndex + i) % cutouts.length]);
+}
+
+function renderBatchScene(
+  ctx: CanvasRenderingContext2D,
+  cutouts: Cutout[],
+  sceneStep: number,
+  phase: number,
+  sampleColor: (x: number, y: number) => string,
+  cutoutConfig: {
+    baseSize: number;
+    variation: number;
+  },
+  width: number,
+  height: number
+) {
+  const scenePulse = 0.94 + Math.sin(phase * Math.PI * 2) * 0.06;
+  const placements: Array<{
+    centerX: number;
+    centerY: number;
+    size: number;
+    cutout: Cutout;
+    signature: ReturnType<typeof getBatchShapeSignature>;
+  }> = [];
+  const visibleCutouts = getBatchSceneVisibleCutouts(cutouts, sceneStep);
+  const sceneShiftX = Math.sin(sceneStep * 0.83) * width * 0.08;
+  const sceneShiftY = Math.cos(sceneStep * 0.67) * height * 0.08;
+
+  ctx.save();
+  visibleCutouts.forEach((cutout, index) => {
+    const signature = getBatchShapeSignature(sceneStep, index);
+    const size =
+      (cutoutConfig.baseSize + cutout.sizeFactor * cutoutConfig.variation * 10) *
+      (width / 800) *
+      1.22 *
+      scenePulse;
+
+    let centerX = cutout.x * width + sceneShiftX + signature.offsetX * size;
+    let centerY = cutout.y * height + sceneShiftY + signature.offsetY * size;
+
+    const minX = size * 0.6;
+    const maxX = width - size * 0.6;
+    const minY = size * 0.6;
+    const maxY = height - size * 0.6;
+
+    let placed = false;
+    for (let attempt = 0; attempt < 18 && !placed; attempt++) {
+      centerX = clamp(centerX, minX, maxX);
+      centerY = clamp(centerY, minY, maxY);
+
+      let overlaps = false;
+      for (const existing of placements) {
+        const dx = centerX - existing.centerX;
+        const dy = centerY - existing.centerY;
+        const minDist = (size + existing.size) * 0.68;
+        if (dx * dx + dy * dy < minDist * minDist) {
+          overlaps = true;
+          const angle = ((sceneStep + 1) * (index + 3) * (attempt + 1) * 0.73) % (Math.PI * 2);
+          const push = minDist * (0.94 + attempt * 0.12);
+          centerX += Math.cos(angle) * push;
+          centerY += Math.sin(angle) * push;
+          break;
+        }
+      }
+
+      if (!overlaps) placed = true;
+    }
+
+    centerX = clamp(centerX, minX, maxX);
+    centerY = clamp(centerY, minY, maxY);
+    placements.push({ centerX, centerY, size, cutout, signature });
+
+    const color = sampleColor(cutout.x, cutout.y);
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(signature.angle);
+    ctx.fillStyle = color;
+    drawBatchMorphShape(ctx, signature.shape, size);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+function renderBatchSceneTransition(
+  ctx: CanvasRenderingContext2D,
+  cutouts: Cutout[],
+  phase: number,
+  sampleColor: (x: number, y: number) => string,
+  cutoutConfig: {
+    baseSize: number;
+    variation: number;
+  },
+  width: number,
+  height: number
+) {
+  const step = Math.floor(phase);
+  const localPhase = phase - step;
+  const activeStep = localPhase < 0.5 ? step : step + 1;
+  const scenePulse = localPhase < 0.5 ? localPhase * 2 : (1 - localPhase) * 2;
+  renderBatchScene(
+    ctx,
+    cutouts,
+    activeStep,
+    easeInOutCubic(scenePulse),
+    sampleColor,
+    cutoutConfig,
+    width,
+    height
+  );
+}
+
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '');
   const n = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
@@ -1842,13 +2011,13 @@ export default function App() {
     setVideoExportBlockedReason(support.reason);
   }, []);
 
-  // 形状切换动画：更快频率随机切换形状和角度
+  // 形状切换动画：连续推进 phase，用双层缩放和旋转做更顺滑的切换
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (activeAnimation === 'batch' && isPlaying) {
       interval = setInterval(() => {
-        setBatchPositionOffset(prev => prev + 1);
-      }, 300);
+        setBatchPositionOffset((prev) => prev + BATCH_PROGRESS_STEP);
+      }, BATCH_FRAME_MS);
     }
     return () => clearInterval(interval);
   }, [activeAnimation, isPlaying]);
@@ -2523,6 +2692,7 @@ export default function App() {
     setActiveAnimation(type);
     trackWithAnalytics({ type: 'play_animation' });
     setIsPlaying(true);
+    if (type === 'batch') setBatchPositionOffset(0);
     
     if (type === 'stars') {
       setShowStarsIntro(true);
@@ -2886,41 +3056,16 @@ export default function App() {
           }
 
           if (activeAnimation === 'batch') {
-            const switchCycle = Math.floor(batchVal * 10); // 录制期间完成的切换次数
-            cutouts.slice(0, 8).forEach((c, index) => {
-              const size = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (mainW / 800) * 1.2;
-              const holeColor = sampleFromBlockData(c.x, c.y);
-              
-              // 使用 batchVal 和索引生成确定性但变化的随机值
-              const randomBase = switchCycle * 1000 + index * 137;
-              const shapeOptions = ['circle', 'square', 'star', 'drop', 'snowflake'];
-              const selectedShape = shapeOptions[randomBase % shapeOptions.length];
-              const randomAngle = (randomBase * 137.508) % (Math.PI * 2);
-              
-              // 位置偏移：随 switchCycle 和 index 产生周期性偏移
-              const posOffsetX = Math.sin(randomBase * 0.7) * size * 0.3;
-              const posOffsetY = Math.cos(randomBase * 0.5) * size * 0.3;
-              
-              ctx.save();
-              ctx.translate(c.x * mainW + posOffsetX, c.y * mainH + posOffsetY);
-              ctx.rotate(randomAngle);
-              ctx.fillStyle = holeColor;
-              
-              // 绘制随机形状
-              if (selectedShape === 'circle') {
-                ctx.beginPath();
-                ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
-                ctx.fill();
-              } else if (selectedShape === 'square') {
-                ctx.fillRect(-size / 2, -size / 2, size, size);
-              } else {
-                ctx.beginPath();
-                addShapePath(ctx, selectedShape as ShapeKind, size);
-                ctx.fill();
-              }
-              
-              ctx.restore();
-            });
+            const batchPhase = batchVal * (DURATION / 1000) * BATCH_SWITCHES_PER_SECOND;
+            renderBatchSceneTransition(
+              ctx,
+              cutouts,
+              batchPhase,
+              sampleFromBlockData,
+              { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
+              mainW,
+              mainH
+            );
           }
         }
       }
@@ -3570,42 +3715,16 @@ export default function App() {
 
     // 3. 动画模式渲染：保持原图+色块，清空形状
     if (activeAnimation === 'batch' && isPlaying) {
-      // 形状切换模式：每次切换显示不同形状类型和不同角度
-      cutouts.slice(0, 8).forEach((c, index) => {
-        const size = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (mainW / 800) * 1.2;
-        const holeColor = sampleFromBlockData(c.x, c.y);
-        
-        // 每次切换使用真正随机产生不同形状、角度和位置
-        const switchCycle = Math.floor(batchPositionOffset);
-        const randomBase = switchCycle * 1000 + index * 137;
-        const shapeOptions = ['circle', 'square', 'star', 'drop', 'snowflake'];
-        const selectedShape = shapeOptions[randomBase % shapeOptions.length];
-        const randomAngle = (randomBase * 137.508) % (Math.PI * 2);
-
-        // 位置偏移：随 switchCycle 和 index 产生周期性偏移
-        const posOffsetX = Math.sin(randomBase * 0.7) * size * 0.3;
-        const posOffsetY = Math.cos(randomBase * 0.5) * size * 0.3;
-
-        mainCtx.save();
-        mainCtx.translate(c.x * mainW + posOffsetX, c.y * mainH + posOffsetY);
-        mainCtx.rotate(randomAngle);
-        mainCtx.fillStyle = holeColor;
-        
-        // 绘制随机形状
-        if (selectedShape === 'circle') {
-          mainCtx.beginPath();
-          mainCtx.arc(0, 0, size / 2, 0, Math.PI * 2);
-          mainCtx.fill();
-        } else if (selectedShape === 'square') {
-          mainCtx.fillRect(-size / 2, -size / 2, size, size);
-        } else {
-          mainCtx.beginPath();
-          addShapePath(mainCtx, selectedShape as ShapeKind, size);
-          mainCtx.fill();
-        }
-        
-        mainCtx.restore();
-      });
+      // 形状切换模式：整组场景一起切换，不做单个形状的变形过渡
+      renderBatchSceneTransition(
+        mainCtx,
+        cutouts,
+        batchPositionOffset,
+        sampleFromBlockData,
+        { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
+        mainW,
+        mainH
+      );
     } else if (activeAnimation === 'pulse' && isPlaying) {
       // 形状叠加模式：每个节拍只新增一个形状
       const rawCount = Math.floor(pulseRevealCount);
@@ -3816,7 +3935,17 @@ export default function App() {
     paintBlockFillOnContext(blockCtx, blockW, blockH, bgConfig, composition);
     
     // 动画模式：形状用纯色填充（孔洞露出色块）
-    if ((activeAnimation === 'batch' || activeAnimation === 'pulse' || activeAnimation === 'stars' || activeAnimation === 'rain' || activeAnimation === 'rainfall') && isPlaying) {
+    if (activeAnimation === 'batch' && isPlaying) {
+      renderBatchSceneTransition(
+        blockCtx,
+        cutouts,
+        batchPositionOffset,
+        () => cutoutConfig.shapeColor,
+        { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
+        blockW,
+        blockH
+      );
+    } else if ((activeAnimation === 'pulse' || activeAnimation === 'stars' || activeAnimation === 'rain' || activeAnimation === 'rainfall') && isPlaying) {
       // 绘制形状（纯色填充，形状孔洞露出色块背景）
       cutouts.forEach((c) => {
         const currentSize =
