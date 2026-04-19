@@ -13,6 +13,78 @@ import { useStats, type FeatureEvent } from './useStats';
 import { useI18n } from '../i18n';
 
 const STORAGE_KEY = 'hicolor_analytics';
+const TRACK_USER_KEY = 'hicolor_track_user_id';
+const TRACK_SESSION_KEY = 'hicolor_track_session_id';
+const TRACK_ENABLE =
+  (import.meta.env.PROD && import.meta.env.VITE_ENABLE_SERVER_TRACKING !== 'false')
+  || import.meta.env.VITE_ENABLE_SERVER_TRACKING === 'true';
+
+function getOrCreateStableId(key: string): string {
+  try {
+    const existed = localStorage.getItem(key);
+    if (existed) return existed;
+    const created = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(key, created);
+    return created;
+  } catch {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+function shouldSendServerEvent(type: FeatureEvent['type']): boolean {
+  switch (type) {
+    case 'page_view':
+    case 'upload_image':
+    case 'export_png':
+    case 'export_video':
+    case 'change_animation':
+    case 'change_texture':
+    case 'open_panel':
+    case 'error_occurred':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function postServerTrack(event: FeatureEvent, locale: string) {
+  if (!TRACK_ENABLE || !shouldSendServerEvent(event.type)) return;
+
+  const payload = {
+    event: event.type,
+    ts: Date.now(),
+    sessionId: getOrCreateStableId(TRACK_SESSION_KEY),
+    userId: getOrCreateStableId(TRACK_USER_KEY),
+    path: typeof window !== 'undefined' ? window.location.pathname : '',
+    locale,
+    props: event,
+  };
+
+  const writeKey = import.meta.env.VITE_ANALYTICS_WRITE_KEY;
+  const body = JSON.stringify(payload);
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (writeKey) headers['x-track-key'] = writeKey;
+
+  // sendBeacon is more reliable during page transitions; fallback to keepalive fetch.
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function' && !writeKey) {
+      const blob = new Blob([body], { type: 'application/json' });
+      navigator.sendBeacon('/api/track', blob);
+      return;
+    }
+  } catch {
+    // fallback below
+  }
+
+  fetch('/api/track', {
+    method: 'POST',
+    headers,
+    body,
+    keepalive: true,
+  }).catch(() => {
+    // Silently ignore network errors to avoid impacting UX.
+  });
+}
 
 export interface HourlyData {
   hour: number;
@@ -140,7 +212,7 @@ function detectBrowser(): string {
 
 export function useEnhancedAnalytics() {
   const { stats, track, resetStats } = useStats();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const recordHourlyStats = useCallback((action: 'visit' | 'upload' | 'export' | 'action') => {
     const now = new Date();
@@ -184,6 +256,7 @@ export function useEnhancedAnalytics() {
 
   const trackWithAnalytics = useCallback((event: FeatureEvent) => {
     track(event);
+    postServerTrack(event, locale);
     if (event.type === 'page_view') recordHourlyStats('visit');
     else if (event.type === 'upload_image') { recordHourlyStats('upload'); recordWeeklyStats('upload'); }
     else if (event.type === 'export_png' || event.type === 'export_video') {
@@ -193,7 +266,7 @@ export function useEnhancedAnalytics() {
     recordHourlyStats('action');
     recordWeeklyStats('action');
     recordDevice();
-  }, [track, recordHourlyStats, recordWeeklyStats, recordDevice]);
+  }, [track, recordHourlyStats, recordWeeklyStats, recordDevice, locale]);
 
   const getAnalytics = useCallback((): EnhancedAnalytics => {
     const data = loadAnalytics();

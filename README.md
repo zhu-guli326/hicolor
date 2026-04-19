@@ -22,3 +22,20 @@ View your app in AI Studio: https://ai.studio/apps/e5b9fce5-b82e-4e8c-a602-2838d
 ## Project Notes
 
 - UI / code structure notes: [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
+
+## Backend Analytics (Vercel + custom sink)
+
+This project now includes a lightweight server ingestion endpoint: `POST /api/track`.
+
+- Frontend hook: `src/hooks/useAnalytics.ts` posts key events (page view, upload, export, etc.) in production.
+- Server endpoint: `api/track.ts` enriches event metadata (`ip`, `ua`, `host`) and logs it.
+- Optional forwarding: set `ANALYTICS_WEBHOOK_URL` to push events into your own backend
+  (for example Alibaba Cloud Function/SLS pipeline).
+
+Recommended Vercel environment variables:
+
+- `VITE_ENABLE_SERVER_TRACKING=true`
+- `VITE_ANALYTICS_WRITE_KEY=<same-secret-as-backend>`
+- `ANALYTICS_WRITE_KEY=<same-secret-as-frontend>`
+- `ANALYTICS_WEBHOOK_URL=<your-ingestion-endpoint>` (optional)
+- `ANALYTICS_WEBHOOK_TOKEN=<bearer-token>` (optional)

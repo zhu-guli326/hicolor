@@ -880,38 +880,90 @@ function applyPaperTexture(
   const imageData = ctx.getImageData(0, 0, w, h);
   const data = imageData.data;
 
-  // 获取平均亮度
+  // 获取平均亮度，暗背景下适当降低纹理强度，避免发脏
   let totalBrightness = 0;
   for (let i = 0; i < data.length; i += 4) {
     totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
   }
   const avgBrightness = totalBrightness / (data.length / 4);
-  const brightnessFactor = avgBrightness > 128 ? 1 : 0.7;
+  const brightnessFactor = avgBrightness > 128 ? 1 : 0.75;
 
   let noiseStrength: number;
+  let clumpStrength: number;
+  let clumpScale: number;
+  let fiberStrength: number;
+  let fiberFrequency: number;
+  let warmBias: number;
+
   switch (textureType) {
     case 'fine-paper':
-      noiseStrength = 6 * brightnessFactor * strengthMultiplier;
+      noiseStrength = 7.5 * brightnessFactor * strengthMultiplier;
+      clumpStrength = 1.2 * strengthMultiplier;
+      clumpScale = 28;
+      fiberStrength = 3.6 * strengthMultiplier;
+      fiberFrequency = 0.34;
+      warmBias = 0.25;
       break;
     case 'grain-paper':
-      noiseStrength = 22 * brightnessFactor * strengthMultiplier;
+      noiseStrength = 14 * brightnessFactor * strengthMultiplier;
+      clumpStrength = 7.8 * strengthMultiplier;
+      clumpScale = 12;
+      fiberStrength = 1.1 * strengthMultiplier;
+      fiberFrequency = 0.17;
+      warmBias = 0.8;
       break;
     case 'coarse-paper':
-      noiseStrength = 35 * brightnessFactor * strengthMultiplier;
+      noiseStrength = 22 * brightnessFactor * strengthMultiplier;
+      clumpStrength = 16 * strengthMultiplier;
+      clumpScale = 7;
+      fiberStrength = 0.35 * strengthMultiplier;
+      fiberFrequency = 0.09;
+      warmBias = 1.5;
       break;
     default:
       return;
   }
 
-  // 使用预计算的噪声遮罩
+  // 细粒度噪声 + 低频团块噪声的叠加，让几种纸张质感差异更明显
   const mask = getNoiseMask(w, h, textureType, 12345);
+  const clumpW = Math.max(1, Math.ceil(w / clumpScale));
+  const clumpH = Math.max(1, Math.ceil(h / clumpScale));
+  const clumpMask = getNoiseMask(clumpW, clumpH, 'fine-noise', 271828);
+
   for (let i = 0; i < w * h; i++) {
-    const noise = mask[i] * noiseStrength;
-    if (Math.abs(noise) < 0.1) continue;
+    const x = i % w;
+    const y = Math.floor(i / w);
+    const cIdx = Math.floor(y / clumpScale) * clumpW + Math.floor(x / clumpScale);
+
+    const baseNoise = mask[i] * noiseStrength;
+    const clumpNoise = clumpMask[cIdx] * clumpStrength;
+
+    // 细纸纹：加入轻微方向纤维；粗纸纹纤维弱但团块更强
+    const fiberWave = Math.sin((x + y * 0.35) * fiberFrequency + clumpNoise * 0.25);
+    const fiber = fiberWave > 0.9 ? fiberStrength : 0;
+
+    let mix = baseNoise + clumpNoise + fiber;
+    if (textureType === 'fine-paper') {
+      mix = baseNoise * 0.65 + clumpNoise * 0.35 + fiber * 1.25;
+    } else if (textureType === 'grain-paper') {
+      mix = baseNoise * 0.9 + clumpNoise * 1.2 + fiber;
+    } else if (textureType === 'coarse-paper') {
+      mix = baseNoise * 0.75 + clumpNoise * 1.65 + fiber;
+      if (Math.abs(clumpNoise) > clumpStrength * 0.45) {
+        mix += Math.sign(clumpNoise) * 1.6 * strengthMultiplier;
+      }
+    }
+    if (Math.abs(mix) < 0.08) continue;
+
     const idx = i * 4;
-    data[idx]     = Math.min(255, Math.max(0, data[idx]     + noise));
-    data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + noise));
-    data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + noise));
+    const r = data[idx];
+    const g = data[idx + 1];
+    const b = data[idx + 2];
+
+    // 给纸张增加一点暖色纤维偏移，视觉更像纸而不是纯噪点
+    data[idx] = Math.min(255, Math.max(0, r + mix + warmBias));
+    data[idx + 1] = Math.min(255, Math.max(0, g + mix * 0.96));
+    data[idx + 2] = Math.min(255, Math.max(0, b + mix * 0.9 - warmBias * 0.25));
   }
 
   ctx.putImageData(imageData, 0, 0);
@@ -926,28 +978,43 @@ function applyPixelTexture(
 ) {
   const imageData = ctx.getImageData(0, 0, w, h);
   const data = imageData.data;
-  const pixelSize = 4;
+  const pixelSize = 1;
 
-  // 使用预计算的像素块噪声
+  // 使用高频噪点 + 低频明暗起伏，让“细腻噪点”与纸张纹理明显区分
   const blockCountX = Math.ceil(w / pixelSize);
   const blockCountY = Math.ceil(h / pixelSize);
   const blockSeed = Math.round(strength);
   const blockMask = getNoiseMask(blockCountX, blockCountY, 'fine-noise', blockSeed);
+  const microMask = getNoiseMask(w, h, 'fine-noise', 314159 + blockSeed);
+  const toneMask = getNoiseMask(Math.ceil(w / 6), Math.ceil(h / 6), 'grain-paper', 2718 + blockSeed);
 
   for (let py = 0; py < h; py += pixelSize) {
     for (let px = 0; px < w; px += pixelSize) {
       const bx = Math.floor(px / pixelSize);
       const by = Math.floor(py / pixelSize);
       const bIdx = by * blockCountX + bx;
-      const brightnessOffset = blockMask[bIdx] * strength;
-      const colorShift = (Math.abs(blockMask[bIdx]) > 0.5 ? blockMask[bIdx] * 0.5 : 0) * strength * 0.3;
+      const tx = Math.floor(px / 6);
+      const ty = Math.floor(py / 6);
+      const tIdx = ty * Math.ceil(w / 6) + tx;
+      const baseGrain = blockMask[bIdx];
+      const micro = microMask[py * w + px];
+      const tone = toneMask[tIdx];
+      const brightnessOffset = baseGrain * strength * 0.42 + tone * strength * 0.2;
+      const salt =
+        Math.abs(micro) > 0.6 ? Math.sign(micro) * strength * 0.22 : 0;
+      const colorShift = micro * strength * 0.08;
 
       for (let dy = 0; dy < pixelSize && py + dy < h; dy++) {
         for (let dx = 0; dx < pixelSize && px + dx < w; dx++) {
-          const idx = ((py + dy) * w + (px + dx)) * 4;
-          data[idx]     = Math.min(255, Math.max(0, data[idx]     + brightnessOffset + colorShift));
-          data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + brightnessOffset + colorShift));
-          data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + brightnessOffset + colorShift));
+          const pxX = px + dx;
+          const pxY = py + dy;
+          const pIdx = pxY * w + pxX;
+          const idx = pIdx * 4;
+          const pixelMicro = microMask[pIdx] * strength * 0.18;
+          const delta = brightnessOffset + pixelMicro + salt;
+          data[idx] = Math.min(255, Math.max(0, data[idx] + delta + colorShift));
+          data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + delta * 0.97));
+          data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + delta * 0.93 - colorShift));
         }
       }
     }
@@ -1086,31 +1153,31 @@ function paintBlockFillOnContext(
     switch (bgConfig.type) {
       case 'solid':
         // 纯色：纹理最明显
-        textureStrengthMultiplier = 1.2;
+        textureStrengthMultiplier = 1.25;
         break;
       case 'split':
         // 双拼色：纹理适中
-        textureStrengthMultiplier = 1.0;
+        textureStrengthMultiplier = 1.1;
         break;
       case 'gradient':
-        // 渐变：纹理较弱，避免干扰渐变效果
-        textureStrengthMultiplier = 0.6;
+        // 渐变：纹理略弱，保留渐变层次
+        textureStrengthMultiplier = 0.85;
         break;
       case 'grid':
-        // 笔记本：纹理很弱，保持线条清晰
-        textureStrengthMultiplier = 0.4;
+        // 笔记本：纹理偏弱，保持线条清晰
+        textureStrengthMultiplier = 0.65;
         break;
       case 'diagonal':
         // 格子：纹理弱，保持格子清晰
-        textureStrengthMultiplier = 0.5;
+        textureStrengthMultiplier = 0.7;
         break;
       case 'block':
         // 棋盘格：纹理适中
-        textureStrengthMultiplier = 0.7;
+        textureStrengthMultiplier = 0.85;
         break;
       case 'dots':
         // 点阵：纹理弱，保持点阵清晰
-        textureStrengthMultiplier = 0.4;
+        textureStrengthMultiplier = 0.65;
         break;
       default:
         textureStrengthMultiplier = 1.0;
@@ -1118,7 +1185,7 @@ function paintBlockFillOnContext(
 
     // 像素风使用特殊的像素块效果
     if (bgConfig.texture === 'fine-noise') {
-      applyPixelTexture(ctx, w, h, 25 * textureStrengthMultiplier);
+      applyPixelTexture(ctx, w, h, 26 * textureStrengthMultiplier);
     } else {
       applyPaperTexture(ctx, w, h, bgConfig.texture, textureStrengthMultiplier);
     }
@@ -5822,23 +5889,47 @@ export default function App() {
                     display: 'block',
                   }}
                 />
-                {/* 颗粒纹理覆盖层 */}
-                {bgConfig.texture === 'grain-paper' && (
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'3\' height=\'3\'%3E%3Ccircle cx=\'1\' cy=\'1\' r=\'0.5\' fill=\'rgba(255,255,255,0.06)\'/%3E%3C/svg%3E")',
-                      backgroundSize: '4px 4px',
-                    }}
-                  />
-                )}
-                {/* 像素风纹理覆盖层 */}
+                {/* 细腻纸张：方向纤维 */}
                 {bgConfig.texture === 'fine-paper' && (
                   <div
                     className="absolute inset-0 pointer-events-none"
                     style={{
-                      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'8\' height=\'8\'%3E%3Cline x1=\'0\' y1=\'0\' x2=\'8\' y2=\'0\' stroke=\'rgba(255,255,255,0.06)\' stroke-width=\'1\'/%3E%3Cline x1=\'0\' y1=\'0\' x2=\'0\' y2=\'8\' stroke=\'rgba(255,255,255,0.06)\' stroke-width=\'1\'/%3E%3C/svg%3E")',
-                      backgroundSize: '8px 8px',
+                      backgroundImage:
+                        'linear-gradient(105deg, rgba(255,255,255,0.14) 0, rgba(255,255,255,0.14) 1px, transparent 1px, transparent 6px), linear-gradient(15deg, rgba(0,0,0,0.035) 0, rgba(0,0,0,0.035) 1px, transparent 1px, transparent 9px)',
+                      backgroundSize: '8px 8px, 12px 12px',
+                    }}
+                  />
+                )}
+                {/* 细腻噪点：高频颗粒 */}
+                {bgConfig.texture === 'fine-noise' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.18) 0.6px, transparent 0.7px), radial-gradient(circle at 2px 2px, rgba(0,0,0,0.12) 0.5px, transparent 0.6px)',
+                      backgroundSize: '3px 3px, 4px 4px',
+                    }}
+                  />
+                )}
+                {/* 颗粒纸张：中颗粒团块 */}
+                {bgConfig.texture === 'grain-paper' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.12) 1.1px, transparent 1.2px), radial-gradient(circle at 4px 3px, rgba(0,0,0,0.08) 1px, transparent 1.1px)',
+                      backgroundSize: '6px 6px, 8px 8px',
+                    }}
+                  />
+                )}
+                {/* 粗砂纸：大颗粒粗糙感 */}
+                {bgConfig.texture === 'coarse-paper' && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        'radial-gradient(circle at 3px 3px, rgba(0,0,0,0.13) 1.4px, transparent 1.5px), radial-gradient(circle at 7px 5px, rgba(255,255,255,0.12) 1.6px, transparent 1.7px)',
+                      backgroundSize: '10px 10px, 12px 12px',
                     }}
                   />
                 )}
