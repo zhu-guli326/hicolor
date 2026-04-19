@@ -10,6 +10,22 @@
     "stats": "Stats",
     "language": "Language"
   },
+  "guide": {
+    "title": "Workflow",
+    "subtitleNoImage": "Upload an image first, then work through Background -> Elements -> Video.",
+    "subtitleWithImage": "Following the background, elements, and video order makes the editor easier to navigate.",
+    "current": "Current panel",
+    "openPanelHint": "Use the bottom navigation to open the panel you want to edit.",
+    "uploadTitle": "Upload image",
+    "uploadDesc": "Start with the main image so the rest of the editor and export tools become available.",
+    "backgroundTitle": "Adjust background",
+    "backgroundDesc": "Lock in layout, block ratio, and background style before fine-tuning the elements.",
+    "exportTitle": "Export output",
+    "exportDesc": "Choose an animation template last, then decide whether to export PNG or video.",
+    "panelBackgroundDesc": "This panel controls layout, color-block area, and background style. It is the foundation of the composition.",
+    "panelElementsDesc": "This panel controls shapes, overlay text, and element distribution. It works best after the background is settled.",
+    "panelVideoDesc": "This panel controls animation templates and video export. Use it once the static layout already feels right."
+  },
   "elements": {
     "shape": "Shape",
     "overlay": "Text",
@@ -49,6 +65,7 @@
   "background": {
     "layout": "Layout",
     "colorRatio": "Color Ratio",
+    "colorRatioHint": "Adjusts only the width of the color block area. The main photo preview size stays the same, and export matches the preview.",
     "bgType": "Background Type",
     "color": "Color",
     "gradient": "Gradient",
@@ -57,8 +74,13 @@
     "animation": "Animation",
     "position": "Position",
     "stripeWidth": "Stripe Width",
+<<<<<<< HEAD
     "stripeWidthHint": "Adjust color block 20%–80%; preview = export",
+=======
+    "stripeWidthHint": "Controls the stripe width in split backgrounds. Larger values create wider stripes.",
+>>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "Pattern Density",
+    "patternDensityHint": "Controls the spacing and weight of grid, checkerboard, and dot patterns. Larger values create bolder patterns.",
     "gradientAngle": "Gradient Angle",
     "bgImage": "Background Image",
     "changeImage": "Change Image",
@@ -172,11 +194,36 @@
     "png": "Export PNG",
     "video": "Export Video",
     "generating": "Generating...",
-    "download": "Download"
+    "download": "Download",
+    "videoUnsupported": "This browser does not provide the video recording APIs needed for direct video export."
   },
   "video": {
     "ready": "Video Ready",
-    "exportSuccess": "Export Success!"
+    "exportSuccess": "Export Success!",
+    "exportActionsHint": "Choose whether to download it now, preview it first, or save it to a local file.",
+    "downloadNow": "Export & Download",
+    "previewResult": "Preview Result",
+    "saveToLocal": "Save to Local File",
+    "backToEditor": "Back to Editor",
+    "localSaveUnsupported": "This browser cannot save directly to a local file. Try download or preview instead.",
+    "localSaveFailed": "Saving to a local file failed. Please try again.",
+    "downloadBlocked": "The browser blocked the download. Try saving to a local file or previewing it instead.",
+    "previewBlocked": "The browser blocked the preview window. Try download or local save instead."
+  },
+  "imageExport": {
+    "prepareButton": "Prepare PNG",
+    "prepareHint": "Generate first, then choose how to save it",
+    "ready": "PNG Ready",
+    "success": "Export Success!",
+    "actionsHint": "Click the button below to download the PNG directly.",
+    "downloadNow": "Download PNG",
+    "previewResult": "Preview Result",
+    "saveToLocal": "Save to Local File",
+    "backToEditor": "Back to Editor",
+    "localSaveUnsupported": "This browser cannot save directly to a local file. Try download or preview instead.",
+    "localSaveFailed": "Saving the PNG to a local file failed. Please try again.",
+    "downloadBlocked": "The browser blocked the PNG download. Try local save or preview instead.",
+    "previewBlocked": "The browser blocked the PNG preview window. Try download or local save instead."
   },
   "text": {
     "addText": "Add Text",
@@ -197,7 +244,11 @@
     "off": "Off",
     "regenerate": "Regenerate",
     "clear": "Clear",
+<<<<<<< HEAD
     "collapse": "Collapse Settings"
+=======
+    "collapse": "Collapse settings panel"
+>>>>>>> b26b5f2 (Improve export flows and editor UX)
   },
   "languages": {
     "zh": "简体中文",

@@ -10,6 +10,22 @@
     "stats": "データ",
     "language": "言語"
   },
+  "guide": {
+    "title": "作業の流れ",
+    "subtitleNoImage": "まず画像をアップロードし、その後に 背景 -> 要素 -> 動画 の順で進めます。",
+    "subtitleWithImage": "背景、要素、動画の順で進めると、画面を行き来せず整理しやすくなります。",
+    "current": "現在のパネル",
+    "openPanelHint": "下部ナビゲーションから編集したいパネルを開けます。",
+    "uploadTitle": "画像をアップロード",
+    "uploadDesc": "最初にメイン画像を入れると、残りの編集機能と書き出し機能が使えるようになります。",
+    "backgroundTitle": "背景を調整",
+    "backgroundDesc": "先にレイアウト、色ブロック比率、背景スタイルを固めると、その後の調整が楽です。",
+    "exportTitle": "書き出し",
+    "exportDesc": "最後にアニメーションテンプレートを選び、PNG か動画を書き出します。",
+    "panelBackgroundDesc": "このパネルではレイアウト、色ブロック領域、背景スタイルを設定します。作品全体の土台です。",
+    "panelElementsDesc": "このパネルでは図形、重ね文字、要素分布を調整します。背景が決まってから触ると整理しやすいです。",
+    "panelVideoDesc": "このパネルではアニメーションテンプレートと動画書き出しを扱います。静止画がまとまってから使うのがおすすめです。"
+  },
   "stats": {
     "title": "データ分析",
     "visits": "訪問",
@@ -142,11 +158,36 @@
     "png": "PNGエクスポート",
     "video": "動画エクスポート",
     "generating": "生成中...",
-    "download": "ダウンロード"
+    "download": "ダウンロード",
+    "videoUnsupported": "現在のブラウザには動画録画 API がなく、直接動画を書き出せません。"
   },
   "video": {
     "ready": "動画の準備完了",
-    "exportSuccess": "エクスポート成功！"
+    "exportSuccess": "エクスポート成功！",
+    "exportActionsHint": "すぐにダウンロードするか、先にプレビューするか、ローカルファイルとして保存するか選べます。",
+    "downloadNow": "書き出してダウンロード",
+    "previewResult": "書き出し後にプレビュー",
+    "saveToLocal": "ローカルファイルに保存",
+    "backToEditor": "エディタに戻る",
+    "localSaveUnsupported": "このブラウザはローカルファイルへの直接保存に対応していません。ダウンロードまたはプレビューをお試しください。",
+    "localSaveFailed": "ローカルファイルへの保存に失敗しました。もう一度お試しください。",
+    "downloadBlocked": "ブラウザがダウンロードをブロックしました。ローカル保存またはプレビューをお試しください。",
+    "previewBlocked": "ブラウザがプレビューをブロックしました。ダウンロードまたはローカル保存をお試しください。"
+  },
+  "imageExport": {
+    "prepareButton": "PNG を生成",
+    "prepareHint": "先に生成してから保存方法を選びます",
+    "ready": "PNG の準備完了",
+    "success": "エクスポート成功！",
+    "actionsHint": "下のボタンを押すと PNG をそのままダウンロードできます。",
+    "downloadNow": "PNG をダウンロード",
+    "previewResult": "書き出し後にプレビュー",
+    "saveToLocal": "ローカルファイルに保存",
+    "backToEditor": "エディタに戻る",
+    "localSaveUnsupported": "このブラウザはローカルファイルへの直接保存に対応していません。ダウンロードまたはプレビューをお試しください。",
+    "localSaveFailed": "PNG のローカル保存に失敗しました。もう一度お試しください。",
+    "downloadBlocked": "ブラウザが PNG のダウンロードをブロックしました。ローカル保存またはプレビューをお試しください。",
+    "previewBlocked": "ブラウザが PNG のプレビューをブロックしました。ダウンロードまたはローカル保存をお試しください。"
   },
   "text": {
     "addText": "テキストを追加",
@@ -170,6 +211,7 @@
   "background": {
     "layout": "レイアウト",
     "colorRatio": "色比率",
+    "colorRatioHint": "色ブロック領域の幅だけを調整します。メイン写真のプレビューサイズは変わらず、書き出し結果もプレビューと一致します。",
     "bgType": "背景タイプ",
     "color": "色",
     "gradient": "グラデーション",
@@ -178,8 +220,13 @@
     "animation": "アニメーション",
     "position": "位置",
     "stripeWidth": "ストライプ幅",
+<<<<<<< HEAD
     "stripeWidthHint": "色ブロック調整 20%–80%; プレビュー = エクスポート",
+=======
+    "stripeWidthHint": "分割背景のストライプ幅を調整します。値が大きいほどストライプが太くなります。",
+>>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "パターン密度",
+    "patternDensityHint": "グリッド、チェッカーボード、ドット背景の密度と太さを調整します。値が大きいほどパターンが強く見えます。",
     "gradientAngle": "グラデーション角度",
     "bgImage": "背景画像",
     "changeImage": "画像を変更",

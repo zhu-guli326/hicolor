@@ -10,6 +10,22 @@
     "stats": "数据",
     "language": "语言"
   },
+  "guide": {
+    "title": "使用步骤",
+    "subtitleNoImage": "先上传图片，再按 背景 -> 元素 -> 视频 的顺序操作。",
+    "subtitleWithImage": "建议按顺序完成背景、元素和视频设置，减少来回切换。",
+    "current": "当前面板",
+    "openPanelHint": "从底部导航切换到要编辑的面板。",
+    "uploadTitle": "上传图片",
+    "uploadDesc": "先放入主图，页面才会出现完整的编辑和导出能力。",
+    "backgroundTitle": "调整背景",
+    "backgroundDesc": "先确定排版、色块占比和底图样式，再去摆元素会更顺手。",
+    "exportTitle": "导出内容",
+    "exportDesc": "最后选择动画模板，决定是导出 PNG 还是导出视频。",
+    "panelBackgroundDesc": "这里负责版式、色块区域和背景样式，是整个作品的基础层。",
+    "panelElementsDesc": "这里负责形状、叠字和元素分布，建议在背景确定后再细调。",
+    "panelVideoDesc": "这里负责动画模板和视频导出，适合在静态画面满意后最后处理。"
+  },
   "stats": {
     "title": "数据分析",
     "visits": "访问",
@@ -142,11 +158,36 @@
     "png": "导出 PNG",
     "video": "导出视频",
     "generating": "正在生成...",
-    "download": "下载"
+    "download": "下载",
+    "videoUnsupported": "当前浏览器缺少视频录制能力，无法直接导出视频。"
   },
   "video": {
     "ready": "视频已准备就绪",
-    "exportSuccess": "导出成功！"
+    "exportSuccess": "导出成功！",
+    "exportActionsHint": "你可以直接下载、先预览一遍，或明确保存到本地文件。",
+    "downloadNow": "导出并下载",
+    "previewResult": "导出后预览",
+    "saveToLocal": "导出到本地文件",
+    "backToEditor": "返回编辑器",
+    "localSaveUnsupported": "当前浏览器不支持直接保存到本地文件，请改用下载或预览。",
+    "localSaveFailed": "保存到本地文件失败，请重试。",
+    "downloadBlocked": "当前浏览器拦截了下载动作，请改用本地保存或预览。",
+    "previewBlocked": "当前浏览器拦截了视频预览，请改用下载或本地保存。"
+  },
+  "imageExport": {
+    "prepareButton": "生成 PNG",
+    "prepareHint": "先生成，再选择保存方式",
+    "ready": "PNG 已准备就绪",
+    "success": "导出成功！",
+    "actionsHint": "点击下面的按钮直接下载 PNG。",
+    "downloadNow": "直接下载 PNG",
+    "previewResult": "导出后预览",
+    "saveToLocal": "导出到本地文件",
+    "backToEditor": "返回编辑器",
+    "localSaveUnsupported": "当前浏览器不支持直接保存到本地文件，请改用下载或预览。",
+    "localSaveFailed": "保存 PNG 到本地文件失败，请重试。",
+    "downloadBlocked": "当前浏览器拦截了 PNG 下载，请改用本地保存或预览。",
+    "previewBlocked": "当前浏览器拦截了 PNG 预览，请改用下载或本地保存。"
   },
   "text": {
     "addText": "添加文字",
@@ -170,6 +211,7 @@
   "background": {
     "layout": "排版模式",
     "colorRatio": "色块占比",
+    "colorRatioHint": "仅改变色块区域宽窄，主图预览尺寸不变；导出效果与预览一致。",
     "bgType": "背景类型",
     "color": "颜色",
     "gradient": "渐变",
@@ -178,8 +220,13 @@
     "animation": "动画",
     "position": "位置",
     "stripeWidth": "条纹宽度",
+<<<<<<< HEAD
     "stripeWidthHint": "调色块 20%–80%; 预览=导出",
+=======
+    "stripeWidthHint": "调整双拼背景中条纹的宽度，数值越大条纹越宽。",
+>>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "图案密度",
+    "patternDensityHint": "调整网格、棋盘格和点阵背景的图案疏密，数值越大图案越粗。",
     "gradientAngle": "渐变角度",
     "bgImage": "背景图片",
     "changeImage": "更换图片",

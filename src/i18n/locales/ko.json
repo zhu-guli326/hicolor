@@ -10,6 +10,22 @@
     "stats": "데이터",
     "language": "언어"
   },
+  "guide": {
+    "title": "작업 순서",
+    "subtitleNoImage": "먼저 이미지를 업로드한 뒤 배경 -> 요소 -> 영상 순서로 진행하세요.",
+    "subtitleWithImage": "배경, 요소, 영상 순서로 작업하면 화면을 덜 오가고 훨씬 정리됩니다.",
+    "current": "현재 패널",
+    "openPanelHint": "하단 내비게이션에서 편집할 패널을 열 수 있습니다.",
+    "uploadTitle": "이미지 업로드",
+    "uploadDesc": "메인 이미지를 먼저 넣어야 나머지 편집 기능과 내보내기 기능이 모두 열립니다.",
+    "backgroundTitle": "배경 조정",
+    "backgroundDesc": "레이아웃, 컬러 블록 비율, 배경 스타일을 먼저 정한 뒤 요소를 만지는 편이 더 쉽습니다.",
+    "exportTitle": "내보내기",
+    "exportDesc": "마지막에 애니메이션 템플릿을 고르고 PNG 또는 영상을 내보내세요.",
+    "panelBackgroundDesc": "이 패널은 레이아웃, 컬러 블록 영역, 배경 스타일을 담당합니다. 전체 구성의 바탕입니다.",
+    "panelElementsDesc": "이 패널은 도형, 오버레이 텍스트, 요소 배치를 담당합니다. 배경을 먼저 정한 뒤 조정하는 편이 깔끔합니다.",
+    "panelVideoDesc": "이 패널은 애니메이션 템플릿과 영상 내보내기를 담당합니다. 정적인 화면이 마음에 든 뒤 마지막에 다루기 좋습니다."
+  },
   "stats": {
     "title": "데이터 분석",
     "visits": "방문",
@@ -142,11 +158,36 @@
     "png": "PNG 내보내기",
     "video": "영상 내보내기",
     "generating": "생성 중...",
-    "download": "다운로드"
+    "download": "다운로드",
+    "videoUnsupported": "현재 브라우저에는 영상 녹화 API가 없어 직접 영상 내보내기를 할 수 없습니다."
   },
   "video": {
     "ready": "영상 준비 완료",
-    "exportSuccess": "내보내기 성공!"
+    "exportSuccess": "내보내기 성공!",
+    "exportActionsHint": "바로 다운로드하거나, 먼저 미리 보거나, 로컬 파일로 저장할 수 있습니다.",
+    "downloadNow": "내보내고 다운로드",
+    "previewResult": "내보낸 뒤 미리보기",
+    "saveToLocal": "로컬 파일로 저장",
+    "backToEditor": "편집기로 돌아가기",
+    "localSaveUnsupported": "이 브라우저는 로컬 파일로 직접 저장을 지원하지 않습니다. 다운로드나 미리보기를 이용해 주세요.",
+    "localSaveFailed": "로컬 파일 저장에 실패했습니다. 다시 시도해 주세요.",
+    "downloadBlocked": "브라우저가 다운로드를 차단했습니다. 로컬 저장이나 미리보기를 이용해 주세요.",
+    "previewBlocked": "브라우저가 미리보기를 차단했습니다. 다운로드나 로컬 저장을 이용해 주세요."
+  },
+  "imageExport": {
+    "prepareButton": "PNG 생성",
+    "prepareHint": "먼저 생성한 뒤 저장 방식을 선택합니다",
+    "ready": "PNG 준비 완료",
+    "success": "내보내기 성공!",
+    "actionsHint": "아래 버튼을 누르면 PNG를 바로 다운로드할 수 있습니다.",
+    "downloadNow": "PNG 다운로드",
+    "previewResult": "내보낸 뒤 미리보기",
+    "saveToLocal": "로컬 파일로 저장",
+    "backToEditor": "편집기로 돌아가기",
+    "localSaveUnsupported": "이 브라우저는 로컬 파일로 직접 저장을 지원하지 않습니다. 다운로드나 미리보기를 이용해 주세요.",
+    "localSaveFailed": "PNG 를 로컬 파일로 저장하지 못했습니다. 다시 시도해 주세요.",
+    "downloadBlocked": "브라우저가 PNG 다운로드를 차단했습니다. 로컬 저장이나 미리보기를 이용해 주세요.",
+    "previewBlocked": "브라우저가 PNG 미리보기를 차단했습니다. 다운로드나 로컬 저장을 이용해 주세요."
   },
   "text": {
     "addText": "텍스트 추가",
@@ -170,6 +211,7 @@
   "background": {
     "layout": "레이아웃",
     "colorRatio": "색 비율",
+    "colorRatioHint": "색상 블록 영역의 너비만 조정합니다. 메인 사진 미리보기 크기는 유지되며, 내보내기 결과도 미리보기와 같습니다.",
     "bgType": "배경 유형",
     "color": "색상",
     "gradient": "그라데이션",
@@ -178,8 +220,13 @@
     "animation": "애니메이션",
     "position": "위치",
     "stripeWidth": "스트라이프 폭",
+<<<<<<< HEAD
     "stripeWidthHint": "색 블록 조정 20%–80%; 프리뷰 = 내보내기",
+=======
+    "stripeWidthHint": "분할 배경의 스트라이프 너비를 조절합니다. 값이 클수록 스트라이프가 더 넓어집니다.",
+>>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "패턴 밀도",
+    "patternDensityHint": "그리드, 체커보드, 도트 배경의 패턴 간격과 굵기를 조절합니다. 값이 클수록 패턴이 더 굵어집니다.",
     "gradientAngle": "그라데이션 각도",
     "bgImage": "배경 이미지",
     "changeImage": "이미지 변경",

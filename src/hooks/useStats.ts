@@ -115,8 +115,7 @@ function loadStats(): Stats {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const stats = JSON.parse(raw) as Stats;
-      updateStreak(stats);
-      return stats;
+      return updateStreak(stats);
     }
   } catch {
     // ignore parse errors
@@ -163,20 +162,29 @@ function createDefaultStats(): Stats {
   };
 }
 
-function updateStreak(stats: Stats) {
+function updateStreak(stats: Stats): Stats {
   const today = getToday();
   const yesterday = getDaysAgo(1);
+  let currentStreak = stats.currentStreak || 0;
+  let longestStreak = stats.longestStreak || 0;
+
   if (stats.lastActiveDate === today) {
     // Already updated today
   } else if (stats.lastActiveDate === yesterday) {
-    stats.currentStreak += 1;
-    if (stats.currentStreak > stats.longestStreak) {
-      stats.longestStreak = stats.currentStreak;
+    currentStreak += 1;
+    if (currentStreak > longestStreak) {
+      longestStreak = currentStreak;
     }
   } else if (stats.lastActiveDate && stats.lastActiveDate !== today) {
-    stats.currentStreak = 1;
+    currentStreak = 1;
   }
-  stats.lastActiveDate = today;
+
+  return {
+    ...stats,
+    currentStreak,
+    longestStreak,
+    lastActiveDate: today,
+  };
 }
 
 function saveStats(stats: Stats) {
@@ -187,11 +195,11 @@ function saveStats(stats: Stats) {
   }
 }
 
-function updateDailyStats(stats: Stats) {
+function updateDailyStats(stats: Stats): Stats {
   const today = getToday();
-  const dailyStats = stats.dailyStats || [];
+  const dailyStats = stats.dailyStats ? [...stats.dailyStats] : [];
   let todayStats = dailyStats.find(d => d.date === today);
-  
+
   if (!todayStats) {
     todayStats = {
       date: today,
@@ -204,12 +212,12 @@ function updateDailyStats(stats: Stats) {
     };
     dailyStats.push(todayStats);
   }
-  
+
   // Keep only last 30 days
   const thirtyDaysAgo = getDaysAgo(30);
-  stats.dailyStats = dailyStats.filter(d => d.date >= thirtyDaysAgo);
-  
-  return stats;
+  const filteredStats = dailyStats.filter(d => d.date >= thirtyDaysAgo);
+
+  return { ...stats, dailyStats: filteredStats };
 }
 
 function getMostUsedKey(usage: FeatureCounts): string {
@@ -228,13 +236,20 @@ function getMostUsedFeature(featureCounts: FeatureCounts): string {
 
 export function useStats() {
   const [stats, setStats] = useState<Stats>(() => {
-    const s = loadStats();
-    s.visitCount += 1;
-    s.lastVisit = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-    updateDailyStats(s);
-    s.dailyStats.find(d => d.date === getToday())!.visitCount += 1;
-    saveStats(s);
-    return s;
+    const loadedStats = loadStats();
+    const initialStats: Stats = {
+      ...loadedStats,
+      visitCount: (loadedStats.visitCount || 0) + 1,
+      lastVisit: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+    };
+    const updated = updateDailyStats(initialStats);
+    const today = getToday();
+    const todayStats = updated.dailyStats.find(d => d.date === today);
+    if (todayStats) {
+      todayStats.visitCount = (todayStats.visitCount || 0) + 1;
+    }
+    saveStats(updated);
+    return updated;
   });
 
   const sessionRef = useRef<SessionData>({
@@ -246,116 +261,124 @@ export function useStats() {
 
   const track = useCallback((event: FeatureEvent) => {
     setStats((prev) => {
-      const next = { ...prev };
-      updateDailyStats(next);
+      // 使用 updateDailyStats 返回新的 dailyStats
+      const updatedResult = updateDailyStats(prev);
+      const next = {
+        ...prev,
+        dailyStats: updatedResult.dailyStats,
+      };
       const todayStats = next.dailyStats.find(d => d.date === getToday())!;
-      next.totalActions += 1;
-      todayStats.actionsCount += 1;
+      // 创建 todayStats 的副本以避免直接修改
+      const todayStatsCopy = todayStats ? { ...todayStats } : null;
+      if (!todayStatsCopy) return next;
+
+      next.totalActions = (next.totalActions || 0) + 1;
+      todayStatsCopy.actionsCount = (todayStatsCopy.actionsCount || 0) + 1;
 
       switch (event.type) {
         case 'upload_image':
-          next.totalUploads += 1;
-          todayStats.uploads += 1;
-          next.featureCounts['upload_image'] = (next.featureCounts['upload_image'] || 0) + 1;
+          next.totalUploads = (next.totalUploads || 0) + 1;
+          todayStatsCopy.uploads = (todayStatsCopy.uploads || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, upload_image: (next.featureCounts['upload_image'] || 0) + 1 };
           sessionRef.current.uploads += 1;
           break;
 
         case 'export_png':
-          next.totalExports += 1;
-          todayStats.exports += 1;
-          next.featureCounts['export_png'] = (next.featureCounts['export_png'] || 0) + 1;
+          next.totalExports = (next.totalExports || 0) + 1;
+          todayStatsCopy.exports = (todayStatsCopy.exports || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, export_png: (next.featureCounts['export_png'] || 0) + 1 };
           sessionRef.current.exports += 1;
           break;
 
         case 'export_video':
-          next.totalVideoExports += 1;
-          todayStats.videoExports += 1;
-          next.featureCounts['export_video'] = (next.featureCounts['export_video'] || 0) + 1;
+          next.totalVideoExports = (next.totalVideoExports || 0) + 1;
+          todayStatsCopy.videoExports = (todayStatsCopy.videoExports || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, export_video: (next.featureCounts['export_video'] || 0) + 1 };
           break;
 
         case 'change_bg_type':
-          next.bgTypeUsage[event.bgType] = (next.bgTypeUsage[event.bgType] || 0) + 1;
-          next.featureCounts['change_bg_type'] = (next.featureCounts['change_bg_type'] || 0) + 1;
+          next.bgTypeUsage = { ...next.bgTypeUsage, [event.bgType]: (next.bgTypeUsage[event.bgType] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_bg_type: (next.featureCounts['change_bg_type'] || 0) + 1 };
           next.mostUsedBgColor = getMostUsedKey(next.bgTypeUsage);
           break;
 
         case 'change_bg_color':
-          next.bgColorUsage[event.color] = (next.bgColorUsage[event.color] || 0) + 1;
-          next.featureCounts['change_bg_color'] = (next.featureCounts['change_bg_color'] || 0) + 1;
+          next.bgColorUsage = { ...next.bgColorUsage, [event.color]: (next.bgColorUsage[event.color] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_bg_color: (next.featureCounts['change_bg_color'] || 0) + 1 };
           next.mostUsedBgColor = getMostUsedKey(next.bgColorUsage);
           break;
 
         case 'change_gradient':
-          next.gradientUsage[event.gradientType] = (next.gradientUsage[event.gradientType] || 0) + 1;
-          next.featureCounts['change_gradient'] = (next.featureCounts['change_gradient'] || 0) + 1;
+          next.gradientUsage = { ...next.gradientUsage, [event.gradientType]: (next.gradientUsage[event.gradientType] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_gradient: (next.featureCounts['change_gradient'] || 0) + 1 };
           break;
 
         case 'change_composition':
-          next.compositionUsage[event.composition] = (next.compositionUsage[event.composition] || 0) + 1;
-          next.featureCounts['change_composition'] = (next.featureCounts['change_composition'] || 0) + 1;
+          next.compositionUsage = { ...next.compositionUsage, [event.composition]: (next.compositionUsage[event.composition] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_composition: (next.featureCounts['change_composition'] || 0) + 1 };
           break;
 
         case 'change_shape_kind':
-          next.shapeKindUsage[event.shapeKind] = (next.shapeKindUsage[event.shapeKind] || 0) + 1;
-          next.featureCounts['change_shape_kind'] = (next.featureCounts['change_shape_kind'] || 0) + 1;
+          next.shapeKindUsage = { ...next.shapeKindUsage, [event.shapeKind]: (next.shapeKindUsage[event.shapeKind] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_shape_kind: (next.featureCounts['change_shape_kind'] || 0) + 1 };
           break;
 
         case 'change_distribution_mode':
-          next.distributionModeUsage[event.mode] = (next.distributionModeUsage[event.mode] || 0) + 1;
-          next.featureCounts['change_distribution_mode'] = (next.featureCounts['change_distribution_mode'] || 0) + 1;
+          next.distributionModeUsage = { ...next.distributionModeUsage, [event.mode]: (next.distributionModeUsage[event.mode] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_distribution_mode: (next.featureCounts['change_distribution_mode'] || 0) + 1 };
           break;
 
         case 'change_creation_mode':
-          next.creationModeUsage[event.mode] = (next.creationModeUsage[event.mode] || 0) + 1;
-          next.featureCounts['change_creation_mode'] = (next.featureCounts['change_creation_mode'] || 0) + 1;
+          next.creationModeUsage = { ...next.creationModeUsage, [event.mode]: (next.creationModeUsage[event.mode] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_creation_mode: (next.featureCounts['change_creation_mode'] || 0) + 1 };
           break;
 
         case 'change_animation':
-          next.animationUsage[event.animation] = (next.animationUsage[event.animation] || 0) + 1;
-          next.featureCounts['change_animation'] = (next.featureCounts['change_animation'] || 0) + 1;
+          next.animationUsage = { ...next.animationUsage, [event.animation]: (next.animationUsage[event.animation] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_animation: (next.featureCounts['change_animation'] || 0) + 1 };
           break;
 
         case 'change_texture':
-          next.textureUsage[event.textureType] = (next.textureUsage[event.textureType] || 0) + 1;
-          next.featureCounts['change_texture'] = (next.featureCounts['change_texture'] || 0) + 1;
+          next.textureUsage = { ...next.textureUsage, [event.textureType]: (next.textureUsage[event.textureType] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_texture: (next.featureCounts['change_texture'] || 0) + 1 };
           break;
 
         case 'change_shape_color':
-          next.shapeColorUsage[event.color] = (next.shapeColorUsage[event.color] || 0) + 1;
-          next.featureCounts['change_shape_color'] = (next.featureCounts['change_shape_color'] || 0) + 1;
+          next.shapeColorUsage = { ...next.shapeColorUsage, [event.color]: (next.shapeColorUsage[event.color] || 0) + 1 };
+          next.featureCounts = { ...next.featureCounts, change_shape_color: (next.featureCounts['change_shape_color'] || 0) + 1 };
           next.mostUsedShapeColor = getMostUsedKey(next.shapeColorUsage);
           break;
 
         case 'play_animation':
-          next.featureCounts['play_animation'] = (next.featureCounts['play_animation'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, play_animation: (next.featureCounts['play_animation'] || 0) + 1 };
           break;
 
         case 'stop_animation':
-          next.featureCounts['stop_animation'] = (next.featureCounts['stop_animation'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, stop_animation: (next.featureCounts['stop_animation'] || 0) + 1 };
           break;
 
         case 'generate_cutouts':
-          next.featureCounts['generate_cutouts'] = (next.featureCounts['generate_cutouts'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, generate_cutouts: (next.featureCounts['generate_cutouts'] || 0) + 1 };
           break;
 
         case 'clear_cutouts':
-          next.featureCounts['clear_cutouts'] = (next.featureCounts['clear_cutouts'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, clear_cutouts: (next.featureCounts['clear_cutouts'] || 0) + 1 };
           break;
 
         case 'add_text_overlay':
-          next.featureCounts['add_text_overlay'] = (next.featureCounts['add_text_overlay'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, add_text_overlay: (next.featureCounts['add_text_overlay'] || 0) + 1 };
           break;
 
         case 'remove_text_overlay':
-          next.featureCounts['remove_text_overlay'] = (next.featureCounts['remove_text_overlay'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, remove_text_overlay: (next.featureCounts['remove_text_overlay'] || 0) + 1 };
           break;
 
         case 'regenerate_cutouts':
-          next.featureCounts['regenerate_cutouts'] = (next.featureCounts['regenerate_cutouts'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, regenerate_cutouts: (next.featureCounts['regenerate_cutouts'] || 0) + 1 };
           break;
 
         case 'start_session':
-          next.sessionCount += 1;
+          next.sessionCount = (next.sessionCount || 0) + 1;
           sessionRef.current.startTime = Date.now();
           sessionRef.current.actions = 0;
           sessionRef.current.uploads = 0;
@@ -364,48 +387,67 @@ export function useStats() {
 
         case 'end_session':
           const sessionDuration = Math.round((Date.now() - sessionRef.current.startTime) / 60000);
-          next.totalSessionMinutes += sessionDuration;
-          next.avgSessionMinutes = Math.round(next.totalSessionMinutes / Math.max(next.sessionCount, 1));
-          if (sessionDuration > next.longestSessionMinutes) {
+          next.totalSessionMinutes = (next.totalSessionMinutes || 0) + sessionDuration;
+          next.avgSessionMinutes = Math.round(next.totalSessionMinutes / Math.max(next.sessionCount || 1, 1));
+          if (sessionDuration > (next.longestSessionMinutes || 0)) {
             next.longestSessionMinutes = sessionDuration;
           }
-          todayStats.sessionMinutes += sessionDuration;
-          next.avgActionsPerSession = Math.round(next.totalActions / Math.max(next.sessionCount, 1));
+          todayStatsCopy.sessionMinutes = (todayStatsCopy.sessionMinutes || 0) + sessionDuration;
+          next.avgActionsPerSession = Math.round(next.totalActions / Math.max(next.sessionCount || 1, 1));
           break;
 
         case 'error_occurred':
-          next.errorsCount += 1;
-          next.featureCounts[`error_${event.errorType}`] = (next.featureCounts[`error_${event.errorType}`] || 0) + 1;
+          next.errorsCount = (next.errorsCount || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, [`error_${event.errorType}`]: (next.featureCounts[`error_${event.errorType}`] || 0) + 1 };
           break;
 
         case 'save_to_favorites':
-          next.creationFavorites += 1;
-          next.featureCounts['save_to_favorites'] = (next.featureCounts['save_to_favorites'] || 0) + 1;
+          next.creationFavorites = (next.creationFavorites || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, save_to_favorites: (next.featureCounts['save_to_favorites'] || 0) + 1 };
           break;
 
         case 'share_creation':
-          next.shares += 1;
-          next.featureCounts['share_creation'] = (next.featureCounts['share_creation'] || 0) + 1;
+          next.shares = (next.shares || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, share_creation: (next.featureCounts['share_creation'] || 0) + 1 };
           break;
 
         case 'change_bg_image':
-          next.featureCounts['change_bg_image'] = (next.featureCounts['change_bg_image'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, change_bg_image: (next.featureCounts['change_bg_image'] || 0) + 1 };
           break;
 
         case 'adjust_opacity':
-          next.featureCounts['adjust_opacity'] = (next.featureCounts['adjust_opacity'] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, adjust_opacity: (next.featureCounts['adjust_opacity'] || 0) + 1 };
           break;
 
         default:
-          next.featureCounts[event.type] = (next.featureCounts[event.type] || 0) + 1;
+          next.featureCounts = { ...next.featureCounts, [event.type]: (next.featureCounts[event.type] || 0) + 1 };
       }
 
+      // 更新 todayStatsCopy 中的统计值
+      todayStatsCopy.actionsCount = (todayStatsCopy.actionsCount || 0) + 1;
+      if (event.type === 'upload_image') {
+        todayStatsCopy.uploads = (todayStatsCopy.uploads || 0) + 1;
+      } else if (event.type === 'export_png') {
+        todayStatsCopy.exports = (todayStatsCopy.exports || 0) + 1;
+      } else if (event.type === 'export_video') {
+        todayStatsCopy.videoExports = (todayStatsCopy.videoExports || 0) + 1;
+      } else if (event.type === 'end_session') {
+        const sessionDuration = Math.round((Date.now() - sessionRef.current.startTime) / 60000);
+        todayStatsCopy.sessionMinutes = (todayStatsCopy.sessionMinutes || 0) + sessionDuration;
+      }
+
+      // 更新 dailyStats 中的 todayStats
+      const today = getToday();
+      next.dailyStats = next.dailyStats.map(d =>
+        d.date === today ? todayStatsCopy : d
+      );
+
       // Update success rates
-      const totalUploads = next.totalUploads;
+      const totalUploads = next.totalUploads || 0;
       const failedUploads = next.featureCounts['upload_failed'] || 0;
       next.uploadSuccessRate = totalUploads > 0 ? Math.round(((totalUploads - failedUploads) / totalUploads) * 100) : 100;
-      
-      const totalExports = next.totalExports + next.totalVideoExports;
+
+      const totalExports = (next.totalExports || 0) + (next.totalVideoExports || 0);
       const failedExports = next.featureCounts['export_failed'] || 0;
       next.exportSuccessRate = totalExports > 0 ? Math.round(((totalExports - failedExports) / totalExports) * 100) : 100;
 

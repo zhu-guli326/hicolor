@@ -304,6 +304,12 @@ function isLikelyIOS(): boolean {
   return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
 }
 
+function isLikelyMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+}
+
 /** 2D 绘制/导出尽量保持原图画质（避免默认低质量插值） */
 function applyHighFidelity2d(ctx: CanvasRenderingContext2D) {
   ctx.imageSmoothingEnabled = true;
@@ -425,6 +431,102 @@ function getLayoutDimensions(
 
   return { mainW, mainH, blockW, blockH, cropX, cropY, sw: blockW, sh: blockH };
 }
+
+function getVideoExtensionFromMimeType(mimeType: string): 'mp4' | 'webm' {
+  return mimeType.toLowerCase().includes('webm') ? 'webm' : 'mp4';
+}
+
+function getPreferredRecorderMimeType() {
+  const candidates = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4',
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (MediaRecorder.isTypeSupported(candidate)) return candidate;
+    } catch {
+      // ignore unsupported candidate errors from some browsers
+    }
+  }
+
+  return '';
+}
+
+function createRecorderWithFallback(
+  stream: MediaStream,
+  preferredMimeType: string,
+  videoBitsPerSecond: number
+) {
+  const attempts: MediaRecorderOptions[] = [];
+
+  if (preferredMimeType) {
+    attempts.push({ mimeType: preferredMimeType, videoBitsPerSecond });
+  }
+  attempts.push({ videoBitsPerSecond });
+  attempts.push({});
+
+  let lastError: unknown = null;
+  for (const options of attempts) {
+    try {
+      const recorder = new MediaRecorder(stream, options);
+      return {
+        recorder,
+        mimeType: options.mimeType || recorder.mimeType || preferredMimeType || 'video/webm',
+      };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('当前浏览器无法初始化视频录制器');
+}
+
+function getVideoExportSupport() {
+  if (typeof window === 'undefined') {
+    return { supported: true, reason: '' };
+  }
+
+  const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
+  const hasCanvasCapture =
+    typeof HTMLCanvasElement !== 'undefined' &&
+    typeof HTMLCanvasElement.prototype.captureStream === 'function';
+
+  if (!hasMediaRecorder || !hasCanvasCapture) {
+    return {
+      supported: false,
+      reason: '当前浏览器缺少视频录制能力，无法直接导出视频',
+    };
+  }
+
+  return { supported: true, reason: '' };
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+const MAX_VIDEO_EXPORT_EDGE = 1280;
+
+type FilePickerWindow = Window & {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    types?: Array<{
+      description?: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<{
+    createWritable: () => Promise<{
+      write: (data: Blob) => Promise<void>;
+      close: () => Promise<void>;
+    }>;
+  }>;
+};
 
 function wrapOverlayLines(
   ctx: CanvasRenderingContext2D,
@@ -1572,7 +1674,7 @@ function TemplateButton({ label, icon, active, onClick, onDeselect, t }: { label
         <button
           onClick={(e) => { e.stopPropagation(); onDeselect(); }}
           className="absolute -top-2 -right-2 w-5 h-5 bg-gray-800 text-white rounded-full flex items-center justify-center text-[10px] font-black hover:bg-gray-900 transition-colors shadow-md"
-          title={t('stats.clearStats')}
+          title="Clear"
         >
           <X size={10} strokeWidth={3} />
         </button>
@@ -1636,6 +1738,8 @@ export default function App() {
   const [exportPhase, setExportPhase] = useState<'record' | 'transcode'>('record');
   const [showExportSuccess, setShowExportSuccess] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [videoExportSupported, setVideoExportSupported] = useState(true);
+  const [videoExportBlockedReason, setVideoExportBlockedReason] = useState('');
   const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
   const [videoMimeType, setVideoMimeType] = useState('video/mp4');
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
@@ -1665,6 +1769,12 @@ export default function App() {
     loadFFmpeg();
   }, []);
 
+  useEffect(() => {
+    const support = getVideoExportSupport();
+    setVideoExportSupported(support.supported);
+    setVideoExportBlockedReason(support.reason);
+  }, []);
+
   // 形状切换动画：更快频率随机切换形状和角度
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -1676,11 +1786,18 @@ export default function App() {
     return () => clearInterval(interval);
   }, [activeAnimation, isPlaying]);
 
-      // 形状叠加动画：逐个显现图形，每 0.1 秒显现一个
+  const prevCutoutsLengthRef = useRef(cutouts.length);
+
+  // 形状叠加动画：逐个显现图形，每次只增加一个，节奏更慢
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (activeAnimation === 'pulse' && isPlaying && cutouts.length > 0) {
-      setPulseRevealCount(0);
+      // 只在 cutouts 长度首次增加时重置（从 0 到有内容）
+      if (prevCutoutsLengthRef.current === 0 && cutouts.length > 0) {
+        setPulseRevealCount(0);
+      }
+      prevCutoutsLengthRef.current = cutouts.length;
+
       interval = setInterval(() => {
         setPulseRevealCount(prev => {
           if (prev >= 50) {
@@ -1689,10 +1806,10 @@ export default function App() {
           }
           return prev + 1;
         });
-      }, 250); // 每0.25秒增加1
+      }, 250); // 每0.25秒增加1个
     }
     return () => clearInterval(interval);
-  }, [activeAnimation, isPlaying, cutouts.length]);
+  }, [activeAnimation, isPlaying]);
 
   // 慢步雨季动画：雨滴从画面中央缓缓下落
   useEffect(() => {
@@ -1828,9 +1945,15 @@ export default function App() {
 
   useEffect(() => {
     fitToScreen();
-    window.addEventListener('resize', fitToScreen);
-    return () => window.removeEventListener('resize', fitToScreen);
-  }, [image, composition, settingsPanelOpen, fitToScreen]);
+    const handleResize = () => fitToScreen();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [image, composition, settingsPanelOpen, blockAreaPercent]);
+
+  const settingsPanelOpenRef = useRef(settingsPanelOpen);
+  useEffect(() => {
+    settingsPanelOpenRef.current = settingsPanelOpen;
+  }, [settingsPanelOpen]);
 
   const measurePreviewContain = useCallback(() => {
     const img = image;
@@ -1849,7 +1972,7 @@ export default function App() {
       const padding = 40;
       const headerHeight = 64;
       const navHeight = 64;
-      const settingsPanelHeight = settingsPanelOpen ? window.innerHeight * 0.32 : 0;
+      const settingsPanelHeight = settingsPanelOpenRef.current ? window.innerHeight * 0.32 : 0;
       av = Math.max(120, window.innerWidth - padding);
       ah = Math.max(
         120,
@@ -1904,14 +2027,14 @@ export default function App() {
         blockH,
       });
     }
-  }, [image, composition, blockAreaPercent, settingsPanelOpen]);
+  }, [image, composition, blockAreaPercent]);
 
   useLayoutEffect(() => {
     if (!image) return;
     measurePreviewContain();
     const id = requestAnimationFrame(() => measurePreviewContain());
     return () => cancelAnimationFrame(id);
-  }, [image, composition, blockAreaPercent, settingsPanelOpen, measurePreviewContain]);
+  }, [image, composition, blockAreaPercent, settingsPanelOpen]);
 
   useEffect(() => {
     if (!image) return;
@@ -1920,7 +2043,7 @@ export default function App() {
     const ro = new ResizeObserver(() => measurePreviewContain());
     ro.observe(stage);
     return () => ro.disconnect();
-  }, [image, measurePreviewContain]);
+  }, [image, composition, blockAreaPercent]);
 
   // 2. Background Configuration
   const [bgConfig, setBgConfig] = useState({
@@ -2338,6 +2461,11 @@ export default function App() {
       setShowStarsIntro(true);
       setTimeout(() => setShowStarsIntro(false), 4000);
     }
+
+    if (image && cutouts.length === 0 && (type === 'pulse' || type === 'batch')) {
+      generateAutoCutouts();
+      return;
+    }
     
     // 根据动画模板调整形状生成
     if (image && cutouts.length > 0) {
@@ -2380,6 +2508,10 @@ export default function App() {
   };
 
   const handleExport = async () => {
+    if (!videoExportSupported) {
+      setExportError(videoExportBlockedReason || '当前浏览器缺少视频录制能力，无法直接导出视频');
+      return;
+    }
     if (!image) {
       setExportError('请先上传一张背景图片');
       return;
@@ -2389,12 +2521,19 @@ export default function App() {
       return;
     }
 
+    if ((activeAnimation === 'pulse' || activeAnimation === 'batch') && cutouts.length === 0) {
+      generateAutoCutouts();
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+
     setExportError(null);
     setIsExporting(true);
     setExportProgress(0);
     setExportPhase('record');
+    if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
     setVideoBlobUrl(null);
 
+<<<<<<< HEAD
     // 临时启用动画播放状态，确保录制时能绘制动画效果
     const previousIsPlaying = isPlaying;
 
@@ -2406,6 +2545,12 @@ export default function App() {
         return;
       }
 
+=======
+    const previousIsPlaying = isPlaying;
+
+    try {
+      // 临时启用动画播放状态，确保录制时能绘制动画效果
+>>>>>>> b26b5f2 (Improve export flows and editor UX)
       setIsPlaying(true);
 
       // 等待一帧，确保动画状态生效
@@ -2413,27 +2558,25 @@ export default function App() {
 
       // 直接使用主画布和色块画布的尺寸，不依赖 previewWrapRef
       const r = blockStripRatio;
-      const { mainW, mainH, blockW, blockH, cropX, cropY, sw: cropW, sh: cropH } =
+      const { mainW: baseMainW, mainH: baseMainH, blockW: baseBlockW, blockH: baseBlockH } =
         getLayoutDimensions(composition, r, image.width, image.height);
 
       const horiz = composition === 'block-left' || composition === 'block-right';
-      const recW = horiz ? mainW + blockW : Math.max(mainW, blockW);
-      const recH = horiz ? Math.max(mainH, blockH) : mainH + blockH;
+      const baseRecW = horiz ? baseMainW + baseBlockW : Math.max(baseMainW, baseBlockW);
+      const baseRecH = horiz ? Math.max(baseMainH, baseBlockH) : baseMainH + baseBlockH;
+      const exportScale = Math.min(1, MAX_VIDEO_EXPORT_EDGE / Math.max(baseRecW, baseRecH));
+      const mainW = Math.max(1, Math.round(baseMainW * exportScale));
+      const mainH = Math.max(1, Math.round(baseMainH * exportScale));
+      const blockW = Math.max(1, Math.round(baseBlockW * exportScale));
+      const blockH = Math.max(1, Math.round(baseBlockH * exportScale));
+      const recW = Math.max(1, Math.round(baseRecW * exportScale));
+      const recH = Math.max(1, Math.round(baseRecH * exportScale));
 
       const canvas = document.createElement('canvas');
       canvas.width = recW;
       canvas.height = recH;
       const ctx = canvas.getContext('2d')!;
       applyHighFidelity2d(ctx);
-
-      // 创建录制画布并复用
-      if (!recordCanvasRef.current || recordCanvasRef.current.width !== recW || recordCanvasRef.current.height !== recH) {
-        recordCanvasRef.current = document.createElement('canvas');
-        recordCanvasRef.current.width = recW;
-        recordCanvasRef.current.height = recH;
-      }
-      const recCtx = recordCanvasRef.current.getContext('2d')!;
-      applyHighFidelity2d(recCtx);
 
       // 建立截图用的离屏画布（mainW×mainH 和 blockW×blockH）
       const mainSnap = document.createElement('canvas');
@@ -2451,13 +2594,13 @@ export default function App() {
         const mc = mainCanvasRef.current;
         if (!mc) return;
         mainSnapCtx.clearRect(0, 0, mainW, mainH);
-        mainSnapCtx.drawImage(mc, 0, 0);
+        mainSnapCtx.drawImage(mc, 0, 0, mc.width, mc.height, 0, 0, mainW, mainH);
       };
       const captureBlock = () => {
         const bc = blockCanvasRef.current;
         if (!bc) return;
         blockSnapCtx.clearRect(0, 0, blockW, blockH);
-        blockSnapCtx.drawImage(bc, 0, 0);
+        blockSnapCtx.drawImage(bc, 0, 0, bc.width, bc.height, 0, 0, blockW, blockH);
       };
 
       // 预计算条带采样（用于雨滴取色）
@@ -2475,35 +2618,36 @@ export default function App() {
         return `rgb(${blockImageData.data[i]},${blockImageData.data[i + 1]},${blockImageData.data[i + 2]})`;
       };
 
+      const lightweightExportEffects =
+        activeAnimation === 'rain' ||
+        activeAnimation === 'rainfall' ||
+        activeAnimation === 'stars';
+      const exportFps = lightweightExportEffects ? 30 : 60;
+
       // 流 & 录制器
-      const stream = canvas.captureStream(60);
-      
-      // 检查浏览器支持的视频格式
-      const mimeTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
-      let supportedType = '';
-      for (const t of mimeTypes) {
-        try {
-          if (MediaRecorder.isTypeSupported(t)) {
-            supportedType = t;
-            console.log('Using video format:', t);
-            break;
-          }
-        } catch (e) {
-          console.warn('Format not supported:', t, e);
-        }
+      const stream = canvas.captureStream(exportFps);
+      const supportedType = getPreferredRecorderMimeType();
+
+      if (typeof MediaRecorder === 'undefined') {
+        throw new Error('当前浏览器内核不支持视频录制，建议改用系统浏览器打开');
       }
-      supportedType = supportedType || 'video/webm';
-      
+
+      if (!supportedType && !('MediaRecorder' in window)) {
+        throw new Error('当前浏览器不支持视频录制');
+      }
+
       console.log('Canvas size:', recW, 'x', recH);
       console.log('Stream tracks:', stream.getTracks().length);
       console.log('MediaRecorder supported:', supportedType);
 
-      const recorder = new MediaRecorder(stream, {
-        mimeType: supportedType,
-        videoBitsPerSecond: 8000000,
-      });
+      const { recorder, mimeType: recorderMimeType } = createRecorderWithFallback(
+        stream,
+        supportedType,
+        lightweightExportEffects ? 5000000 : 8000000
+      );
 
       const chunks: Blob[] = [];
+      let recorderError: Error | null = null;
       recorder.ondataavailable = (e) => { 
         if (e.data.size > 0) {
           chunks.push(e.data);
@@ -2513,84 +2657,35 @@ export default function App() {
 
       recorder.onerror = (e) => {
         console.error('MediaRecorder error:', e);
+        recorderError = new Error('浏览器录制器运行失败，正在尝试兼容模式导出');
       };
 
       recorder.onstop = async () => {
-        // 用 chunks[0].type 动态判断原始录制格式
-        const rawType = chunks.length > 0 ? chunks[0].type : 'video/webm';
-        const webmBlob = new Blob(chunks, { type: rawType });
+        stream.getTracks().forEach((track) => track.stop());
 
-        // 确保 FFmpeg 已加载
-        if (!ffmpegRef.current) {
-          setExportError('FFmpeg 未加载，请稍后重试');
-          setIsExporting(false);
-          setIsPlaying(previousIsPlaying);
-          return;
+        if (chunks.length === 0) {
+          try {
+            await exportByFrameSequence();
+            return;
+          } catch (fallbackErr) {
+            console.error('Frame sequence export failed:', fallbackErr);
+            setExportError(
+              recorderError?.message ||
+              (fallbackErr instanceof Error ? fallbackErr.message : '导出失败，请重试')
+            );
+            setIsExporting(false);
+            setIsPlaying(previousIsPlaying);
+            return;
+          }
         }
-        const ffmpeg = ffmpegRef.current;
 
-        // 更新 UI：进入转码阶段
-        setExportProgress(80);
-        setExportPhase('transcode');
-        setVideoMimeType('video/mp4');
+        const rawType = chunks[0]?.type || recorderMimeType || supportedType || 'video/webm';
+        const recordedBlob = new Blob(chunks, { type: rawType });
 
-        // 监听 FFmpeg 转码进度
-        ffmpeg.on('progress', ({ progress }) => {
-          // 录制阶段占 80%，转码占剩余 20%
-          setExportProgress(Math.round(80 + progress * 20));
-        });
-
-        try {
-          // 写入 webm 到 FFmpeg 虚拟文件系统
-          await ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
-
-          // 执行转码：webm → mp4
-          await ffmpeg.exec([
-            '-i', 'input.webm',
-            '-c:v', 'libx264',
-            '-crf', '23',
-            '-preset', 'fast',
-            '-c:a', 'aac',
-            '-b:a', '128k',
-            '-movflags', '+faststart',
-            'output.mp4',
-          ]);
-
-          // 读取转码后的 mp4
-          const mp4Data = await ffmpeg.readFile('output.mp4');
-          const mp4Blob = new Blob([mp4Data], { type: 'video/mp4' });
-
-          // 清理 FFmpeg 虚拟文件，释放内存
-          await ffmpeg.deleteFile('input.webm');
-          await ffmpeg.deleteFile('output.mp4');
-
-          // 清理旧的 blob URL
-          if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
-          const url = URL.createObjectURL(mp4Blob);
-          setVideoBlobUrl(url);
-          setExportProgress(100);
-          setIsExporting(false);
-          setShowExportSuccess(true);
-          trackWithAnalytics({ type: 'export_video' });
-          // 恢复之前的播放状态
-          setIsPlaying(previousIsPlaying);
-        } catch (err) {
-          console.error('FFmpeg 转码失败:', err);
-          // 转码失败时降级：直接返回 webm
-          if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
-          const url = URL.createObjectURL(webmBlob);
-          setVideoBlobUrl(url);
-          setVideoMimeType('video/webm');
-          setExportProgress(100);
-          setIsExporting(false);
-          setShowExportSuccess(true);
-          trackWithAnalytics({ type: 'export_video' });
-          // 恢复之前的播放状态
-          setIsPlaying(previousIsPlaying);
-        }
+        finalizeExport(recordedBlob, rawType || 'video/webm');
       };
 
-      recorder.start();
+      recorder.start(250);
 
       // 基础层只绘制一次（动画过程中不变）
       const drawBaseLayer = (ctx: CanvasRenderingContext2D) => {
@@ -2611,7 +2706,7 @@ export default function App() {
       drawBaseLayer(ctx);
 
       // 动画参数
-      const DURATION = 3000; // ms
+      const DURATION = activeAnimation === 'pulse' ? 5000 : 3000; // ms
       const startTime = performance.now();
 
       let rainfallVal = 0;
@@ -2619,42 +2714,49 @@ export default function App() {
       let pulseVal = 0;
       let batchVal = 0;
 
-      const captureFrame = () => {
-        const elapsed = performance.now() - startTime;
-        const t = Math.min(1, elapsed / DURATION);
-        // 录制阶段占前 80%，FFmpeg 转码占后 20%
+      function finalizeExport(blob: Blob, mimeType: string) {
+        const url = URL.createObjectURL(blob);
+        setVideoBlobUrl(url);
+        setVideoMimeType(mimeType);
+        setExportProgress(100);
+        setIsExporting(false);
+        setShowExportSuccess(true);
+        trackWithAnalytics({ type: 'export_video' });
+        setIsPlaying(previousIsPlaying);
+      }
+
+      function renderFrame(t: number) {
         setExportProgress(Math.round(t * 80));
 
-        // 只在第一帧绘制底图，后续帧跳过（底图已固定）
         ctx.clearRect(0, 0, recW, recH);
         drawBaseLayer(ctx);
 
-        // 叠加动画效果（绘制在 recCtx 上，然后合成到 ctx）
         if (activeAnimation !== 'none') {
-          // 同步动画参数
           if (activeAnimation === 'rain') rainfallVal = t;
           if (activeAnimation === 'rainfall') rainfallVal = t;
           if (activeAnimation === 'stars') starVal = t;
           if (activeAnimation === 'pulse') pulseVal = t;
           if (activeAnimation === 'batch') batchVal = t;
 
-          // 雨季动画 (rain / rainfall)
-          if ((activeAnimation === 'rain' || activeAnimation === 'rainfall') && isPlaying) {
-            const raindropCount = 40;
+          if (activeAnimation === 'rain' || activeAnimation === 'rainfall') {
+            const raindropCount = lightweightExportEffects ? 18 : 40;
             for (let i = 0; i < raindropCount; i++) {
               const rx = (mainW / raindropCount) * i + mainW / (raindropCount * 2);
               const rainY = mainH * rainfallVal + i * (mainH / raindropCount);
               if (rainY < 0 || rainY >= mainH) continue;
               const rc = sampleFromBlockData(rx / mainW, rainY / mainH);
               ctx.fillStyle = rc;
-              ctx.beginPath();
-              ctx.ellipse(rx, rainY, 3, 10, 0, 0, Math.PI * 2);
-              ctx.fill();
+              if (lightweightExportEffects) {
+                ctx.fillRect(rx - 2, rainY - 8, 4, 16);
+              } else {
+                ctx.beginPath();
+                ctx.ellipse(rx, rainY, 3, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+              }
             }
           }
 
-          // 星星动画 (stars)
-          if (activeAnimation === 'stars' && isPlaying) {
+          if (activeAnimation === 'stars') {
             const drawStarOnCtx = (starCtx: CanvasRenderingContext2D, sx: number, sy: number, size: number, pts: number, alpha: number) => {
               starCtx.save();
               starCtx.fillStyle = `rgba(255,255,240,${alpha})`;
@@ -2675,29 +2777,36 @@ export default function App() {
             const mainStarSize = Math.min(mainW, mainH) * 0.15;
             const mainGlowRadius = mainStarSize * (1.5 + starVal * 2.5);
             const mainGlowAlpha = 0.6 + starVal * 0.4;
-            const mainGlow = ctx.createRadialGradient(mainStarX, mainStarY, 0, mainStarX, mainStarY, mainGlowRadius);
-            mainGlow.addColorStop(0, `rgba(255,255,240,${mainGlowAlpha})`);
-            mainGlow.addColorStop(0.4, `rgba(255,255,200,${mainGlowAlpha * 0.6})`);
-            mainGlow.addColorStop(1, 'rgba(255,255,200,0)');
-            ctx.fillStyle = mainGlow;
-            ctx.beginPath();
-            ctx.arc(mainStarX, mainStarY, mainGlowRadius, 0, Math.PI * 2);
-            ctx.fill();
+            if (lightweightExportEffects) {
+              ctx.fillStyle = `rgba(255,255,220,${0.18 + starVal * 0.32})`;
+              ctx.beginPath();
+              ctx.arc(mainStarX, mainStarY, mainGlowRadius * 0.68, 0, Math.PI * 2);
+              ctx.fill();
+            } else {
+              const mainGlow = ctx.createRadialGradient(mainStarX, mainStarY, 0, mainStarX, mainStarY, mainGlowRadius);
+              mainGlow.addColorStop(0, `rgba(255,255,240,${mainGlowAlpha})`);
+              mainGlow.addColorStop(0.4, `rgba(255,255,200,${mainGlowAlpha * 0.6})`);
+              mainGlow.addColorStop(1, 'rgba(255,255,200,0)');
+              ctx.fillStyle = mainGlow;
+              ctx.beginPath();
+              ctx.arc(mainStarX, mainStarY, mainGlowRadius, 0, Math.PI * 2);
+              ctx.fill();
+            }
             drawStarOnCtx(ctx, mainStarX, mainStarY, mainStarSize, 6, 0.15 + starVal * 0.85);
             drawStarOnCtx(ctx, mainW * 0.25, mainH * 0.25, mainStarSize * 0.6, 5, 0.15 + starVal * 0.55);
             drawStarOnCtx(ctx, mainW * 0.75, mainH * 0.3, mainStarSize * 0.65, 5, 0.15 + starVal * 0.6);
-            drawStarOnCtx(ctx, mainW * 0.2, mainH * 0.6, mainStarSize * 0.5, 5, 0.15 + starVal * 0.45);
-            drawStarOnCtx(ctx, mainW * 0.8, mainH * 0.65, mainStarSize * 0.55, 5, 0.15 + starVal * 0.5);
+            if (!lightweightExportEffects) {
+              drawStarOnCtx(ctx, mainW * 0.2, mainH * 0.6, mainStarSize * 0.5, 5, 0.15 + starVal * 0.45);
+              drawStarOnCtx(ctx, mainW * 0.8, mainH * 0.65, mainStarSize * 0.55, 5, 0.15 + starVal * 0.5);
+            }
           }
 
-          // pulse 动画
-          if (activeAnimation === 'pulse' && isPlaying) {
-            const holeColor = cutoutConfig.shapeColor;
-            cutouts.forEach((c) => {
-              const rawCount = Math.floor(pulseVal * 2);
-              const visibleCount = Math.min(20, Math.max(0, rawCount));
-              const idx = cutouts.indexOf(c);
-              if (idx >= visibleCount) return;
+          if (activeAnimation === 'pulse') {
+            const rawCount = Math.floor(pulseVal * 20);
+            const visibleCount = Math.min(20, Math.max(0, rawCount));
+            for (let idx = 0; idx < visibleCount && idx < cutouts.length; idx++) {
+              const c = cutouts[idx];
+              const holeColor = sampleFromBlockData(c.x, c.y);
               ctx.save();
               ctx.translate(c.x * mainW, c.y * mainH);
               ctx.rotate(c.angle + pulseVal * 0.1);
@@ -2720,11 +2829,10 @@ export default function App() {
                 }
               }
               ctx.restore();
-            });
+            }
           }
 
-          // batch 形状切换动画
-          if (activeAnimation === 'batch' && isPlaying) {
+          if (activeAnimation === 'batch') {
             const switchCycle = Math.floor(batchVal * 10); // 录制期间完成的切换次数
             cutouts.slice(0, 8).forEach((c, index) => {
               const size = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (mainW / 800) * 1.2;
@@ -2762,13 +2870,80 @@ export default function App() {
             });
           }
         }
+      }
 
-        recorder.requestData();
+      async function exportByFrameSequence() {
+        if (!ffmpegRef.current) {
+          throw new Error('视频编码器尚未准备完成，请稍后再试');
+        }
 
+        const ffmpeg = ffmpegRef.current;
+        const fps = 30;
+        const totalFrames = Math.max(1, Math.round((DURATION / 1000) * fps));
+        const frameNames: string[] = [];
+
+        setExportPhase('transcode');
+        setVideoMimeType('video/mp4');
+
+        ffmpeg.on('progress', ({ progress }) => {
+          setExportProgress(Math.max(80, Math.round(80 + progress * 20)));
+        });
+
+        try {
+          for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+            const t = totalFrames === 1 ? 1 : frameIndex / (totalFrames - 1);
+            renderFrame(t);
+            const frameBlob = await canvasToBlob(canvas, 'image/png');
+            if (!frameBlob) {
+              throw new Error('生成视频帧失败');
+            }
+
+            const frameName = `frame-${String(frameIndex).padStart(4, '0')}.png`;
+            frameNames.push(frameName);
+            await ffmpeg.writeFile(frameName, await fetchFile(frameBlob));
+          }
+
+          await ffmpeg.exec([
+            '-framerate', String(fps),
+            '-i', 'frame-%04d.png',
+            '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1',
+            '-c:v', 'libx264',
+            '-crf', '23',
+            '-preset', 'fast',
+            '-pix_fmt', 'yuv420p',
+            '-movflags', '+faststart',
+            'output.mp4',
+          ]);
+
+          const mp4Data = await ffmpeg.readFile('output.mp4');
+          const mp4Blob = new Blob([mp4Data], { type: 'video/mp4' });
+          try { await ffmpeg.deleteFile('output.mp4'); } catch {}
+          for (const frameName of frameNames) {
+            try { await ffmpeg.deleteFile(frameName); } catch {}
+          }
+          finalizeExport(mp4Blob, 'video/mp4');
+        } catch (err) {
+          try { await ffmpeg.deleteFile('output.mp4'); } catch {}
+          for (const frameName of frameNames) {
+            try { await ffmpeg.deleteFile(frameName); } catch {}
+          }
+          throw err;
+        }
+      }
+
+      const captureFrame = () => {
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(1, elapsed / DURATION);
+        renderFrame(t);
         if (t < 1) {
           requestAnimationFrame(captureFrame);
         } else {
-          recorder.stop();
+          try {
+            recorder.requestData();
+          } catch {}
+          setTimeout(() => {
+            if (recorder.state !== 'inactive') recorder.stop();
+          }, 80);
         }
       };
 
@@ -2779,21 +2954,127 @@ export default function App() {
 
     } catch (err) {
       console.error('Export failed:', err);
-      setExportError('视频合成失败，请重试');
+      setExportError(err instanceof Error ? err.message : '视频合成失败，请重试');
       setIsExporting(false);
       setIsPlaying(previousIsPlaying);
     }
   };
 
+  const getVideoDownloadFileName = () => {
+    const ext = getVideoExtensionFromMimeType(videoMimeType);
+    return `hicolor_${activeAnimation}_video.${ext}`;
+  };
+
   const downloadResult = () => {
     if (!videoBlobUrl) return;
-    const link = document.createElement('a');
-    link.href = videoBlobUrl;
-    link.download = `hicolor_${activeAnimation}_video.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setShowExportSuccess(false);
+
+    try {
+      const link = document.createElement('a');
+      link.href = videoBlobUrl;
+      link.download = getVideoDownloadFileName();
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setShowExportSuccess(false);
+    } catch (err) {
+      console.error('Save video failed:', err);
+      try {
+        window.open(videoBlobUrl, '_blank', 'noopener,noreferrer');
+        setShowExportSuccess(false);
+      } catch (openErr) {
+        console.error('Open video preview failed:', openErr);
+        setExportError(t('video.downloadBlocked'));
+      }
+    }
+  };
+
+  const previewVideoResult = () => {
+    if (!videoBlobUrl) return;
+
+    try {
+      window.open(videoBlobUrl, '_blank', 'noopener,noreferrer');
+      setShowExportSuccess(false);
+    } catch (err) {
+      console.error('Open video preview failed:', err);
+      setExportError(t('video.previewBlocked'));
+    }
+  };
+
+  const saveVideoToLocalFile = async () => {
+    if (!videoBlobUrl) return;
+
+    const pickerApi = (window as Window & {
+      showSaveFilePicker?: (options?: {
+        suggestedName?: string;
+        excludeAcceptAllOption?: boolean;
+        types?: Array<{
+          description?: string;
+          accept: Record<string, string[]>;
+        }>;
+      }) => Promise<{
+        createWritable: () => Promise<{
+          write: (data: Blob) => Promise<void>;
+          close: () => Promise<void>;
+        }>;
+      }>;
+    }).showSaveFilePicker;
+
+    if (!pickerApi) {
+      setExportError(t('video.localSaveUnsupported'));
+      return;
+    }
+
+    try {
+      const ext = getVideoExtensionFromMimeType(videoMimeType);
+      const blob = await fetch(videoBlobUrl).then((res) => res.blob());
+      const handle = await pickerApi({
+        suggestedName: `hicolor_${activeAnimation}_video.${ext}`,
+        excludeAcceptAllOption: false,
+        types: [
+          {
+            description: videoMimeType.includes('webm') ? 'WEBM Video' : 'MP4 Video',
+            accept: {
+              [videoMimeType]: [`.${ext}`],
+            },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      setShowExportSuccess(false);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      console.error('Save to local file failed:', err);
+      setExportError(t('video.localSaveFailed'));
+    }
+  };
+
+  const getImageDownloadFileName = () => `hicolor-${Date.now()}.png`;
+
+  const triggerImageDownload = (blobUrl: string, fileName: string) => {
+    try {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return true;
+    } catch (err) {
+      console.error('Download image failed:', err);
+      try {
+        window.open(blobUrl, '_blank', 'noopener,noreferrer');
+        return true;
+      } catch (openErr) {
+        console.error('Preview image failed:', openErr);
+        setExportError(t('imageExport.downloadBlocked'));
+        return false;
+      }
+    }
   };
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -3273,9 +3554,8 @@ export default function App() {
         mainCtx.restore();
       });
     } else if (activeAnimation === 'pulse' && isPlaying) {
-      // 形状叠加模式：形状从零到二十逐步叠加显示
-      // 根据 pulseRevealCount 计算显示的形状数量 (0-10 -> 0-20)
-      const rawCount = Math.floor(pulseRevealCount * 2);
+      // 形状叠加模式：每个节拍只新增一个形状
+      const rawCount = Math.floor(pulseRevealCount);
       const visibleCount = Math.min(20, Math.max(0, rawCount));
       
       // 绘制逐个叠加的形状
@@ -3622,16 +3902,24 @@ export default function App() {
       sctx.drawImage(mainCanvas, 0, ih, iw, ih);
     }
 
-    const filename = `hicolor-${Date.now()}.png`;
     const blob = await new Promise<Blob | null>((resolve) => {
       saveCanvas.toBlob((b) => resolve(b), 'image/png');
     });
     if (!blob) return;
 
     trackWithAnalytics({ type: 'export_png' });
+    const objectUrl = URL.createObjectURL(blob);
+    const filename = getImageDownloadFileName();
 
-    // 1) Web Share + 文件：移动端保存到相册/微信最可靠（async 仍常保留用户激活）
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    // 桌面端：生成后直接下载，不再弹中间成功层
+    if (!isLikelyMobileDevice()) {
+      triggerImageDownload(objectUrl, filename);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      return;
+    }
+
+    // 2) Web Share + 文件：仅保留给移动端，避免桌面端进入分享弹窗
+    if (isLikelyMobileDevice() && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
         const file = new File([blob], filename, { type: 'image/png' });
         const payload: ShareData = { files: [file], title: 'hicolor' };
@@ -3645,9 +3933,7 @@ export default function App() {
       }
     }
 
-    const objectUrl = URL.createObjectURL(blob);
-
-    // 2) iOS：download 常无效；新开标签展示 PNG，用户可长按 → 存储图像，或用 Safari 分享
+    // 3) iOS：download 常无效；新开标签展示 PNG，用户可长按 → 存储图像，或用 Safari 分享
     if (isLikelyIOS()) {
       const w = window.open(objectUrl, '_blank', 'noopener,noreferrer');
       if (w) {
@@ -3656,7 +3942,7 @@ export default function App() {
       }
     }
 
-    // 3) 桌面 / Android：Blob + download
+    // 4) 兜底：Blob + download
     try {
       const link = document.createElement('a');
       link.href = objectUrl;
@@ -4316,13 +4602,13 @@ export default function App() {
             </>
           )}
         </div>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="rounded-full bg-gray-50 p-2 text-gray-600 transition-all hover:bg-gray-100 active:scale-90 sm:p-2.5"
+        <label
+          htmlFor="main-image-upload"
+          className="cursor-pointer rounded-full bg-gray-50 p-2 text-gray-600 transition-all hover:bg-gray-100 active:scale-90 sm:p-2.5"
           title={t('upload.title')}
         >
           <Upload size={20} />
-        </button>
+        </label>
         {image && (
           <button
             onClick={handleSave}
@@ -4347,6 +4633,23 @@ export default function App() {
     </nav>
   );
 
+  const panelMeta = activeTab === 'background'
+    ? {
+        title: t('nav.background'),
+        description: t('guide.panelBackgroundDesc'),
+      }
+    : activeTab === 'elements'
+      ? {
+          title: t('nav.elements'),
+          description: t('guide.panelElementsDesc'),
+        }
+      : activeTab === 'video'
+        ? {
+            title: t('nav.video'),
+            description: t('guide.panelVideoDesc'),
+          }
+        : null;
+
   const renderSettingsPanel = () => {
     if (!settingsPanelOpen) return null;
     return (
@@ -4359,6 +4662,12 @@ export default function App() {
         >
           <X size={20} />
         </button>
+        {panelMeta && (
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/80 px-4 py-3 pr-12">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-500">{panelMeta.title}</div>
+            <p className="mt-1 text-[11px] leading-5 text-gray-500">{panelMeta.description}</p>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {activeTab === 'background' && (
             <motion.div
@@ -4409,7 +4718,11 @@ export default function App() {
                     className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
                   />
                   <p className="text-[8px] font-bold text-gray-400 leading-snug">
+<<<<<<< HEAD
                     {t('stripeWidthHint')}
+=======
+                    {t('background.colorRatioHint')}
+>>>>>>> b26b5f2 (Improve export flows and editor UX)
                   </p>
                 </div>
               </div>
@@ -4595,6 +4908,9 @@ export default function App() {
                     onChange={(e) => setBgConfig((prev) => ({ ...prev, stripeSize: Number(e.target.value) }))}
                     className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
                   />
+                  <p className="text-[8px] font-bold text-gray-400 leading-snug">
+                    {t('background.stripeWidthHint')}
+                  </p>
                 </div>
               )}
 
@@ -4613,6 +4929,9 @@ export default function App() {
                     onChange={(e) => setBgConfig((prev) => ({ ...prev, stripeSize: Number(e.target.value) }))}
                     className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-emerald-600"
                   />
+                  <p className="text-[8px] font-bold text-gray-400 leading-snug">
+                    {t('background.patternDensityHint')}
+                  </p>
                 </div>
               )}
 
@@ -5369,15 +5688,21 @@ export default function App() {
               {/* 导出视频按钮 */}
               <button
                 onClick={handleExport}
-                disabled={!image}
+                disabled={!image || !videoExportSupported}
+                title={!videoExportSupported ? videoExportBlockedReason : undefined}
                 className={`w-full py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                  image
+                  image && videoExportSupported
                     ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/25'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
                 <Video size={16} /><span>{t('export.video')}</span>
               </button>
+              {!videoExportSupported && (
+                <p className="text-[10px] leading-4 text-amber-700 font-bold">
+                  {t('export.videoUnsupported')}
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -5448,9 +5773,9 @@ export default function App() {
             >
               <div className="relative inline-block">
                 <div className="absolute -inset-10 bg-emerald-100/30 blur-3xl rounded-full" />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="relative mx-auto flex h-52 w-full max-w-sm flex-col items-center justify-center space-y-5 rounded-[2.5rem] border-2 border-dashed border-gray-200 bg-white/80 transition-all duration-500 hover:border-emerald-400 hover:bg-white hover:shadow-2xl group sm:h-56 sm:rounded-[3rem]"
+                <label
+                  htmlFor="main-image-upload"
+                  className="relative mx-auto flex h-52 w-full max-w-sm cursor-pointer flex-col items-center justify-center space-y-5 rounded-[2.5rem] border-2 border-dashed border-gray-200 bg-white/80 transition-all duration-500 hover:border-emerald-400 hover:bg-white hover:shadow-2xl group sm:h-56 sm:rounded-[3rem]"
                 >
                   <div className="w-16 h-16 rounded-3xl bg-gray-50 flex items-center justify-center text-gray-600 group-hover:bg-emerald-100 group-hover:text-emerald-700 group-hover:rotate-12 transition-all duration-500">
                     <Upload className="w-7 h-7 text-gray-400 group-hover:text-white" />
@@ -5459,7 +5784,7 @@ export default function App() {
                     <p className="text-sm font-black text-gray-900 uppercase tracking-widest">{t('upload.startCreating')}</p>
                     <p className="text-[9px] text-gray-400 font-bold uppercase tracking-[0.2em]">Support JPG, PNG, WEBP</p>
                   </div>
-                </button>
+                </label>
               </div>
             </motion.div>
           ) : (
@@ -5849,11 +6174,12 @@ export default function App() {
         </div>
         
         <input
+          id="main-image-upload"
           ref={fileInputRef}
           type="file"
           accept="image/*"
           onChange={handleImageUpload}
-          className="hidden"
+          className="sr-only"
         />
       </main>
 
@@ -5925,20 +6251,37 @@ export default function App() {
               </div>
               <div>
                 <h3 className="font-black text-2xl text-gray-900">{t('video.exportSuccess')}</h3>
-                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">{t('video.ready')}</p>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-2">
+                  {t('video.ready')} {videoMimeType.includes('webm') ? '(WEBM)' : '(MP4)'}
+                </p>
+                <p className="text-sm text-gray-500 mt-3 leading-6">
+                  {t('video.exportActionsHint')}
+                </p>
               </div>
               <div className="space-y-3 pt-4">
                 <button
                   onClick={downloadResult}
                   className="w-full bg-emerald-600 text-white py-3 rounded-xl font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-lg"
                 >
-                  下载 MP4 视频
+                  {t('video.downloadNow')}
+                </button>
+                <button
+                  onClick={previewVideoResult}
+                  className="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-black uppercase tracking-widest hover:bg-slate-200 transition-colors"
+                >
+                  {t('video.previewResult')}
+                </button>
+                <button
+                  onClick={() => void saveVideoToLocalFile()}
+                  className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-black uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                >
+                  {t('video.saveToLocal')}
                 </button>
                 <button
                   onClick={() => setShowExportSuccess(false)}
                   className="w-full text-gray-400 font-bold py-2 hover:text-gray-600 transition-colors"
                 >
-                  返回编辑器
+                  {t('video.backToEditor')}
                 </button>
               </div>
             </motion.div>

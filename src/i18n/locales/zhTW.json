@@ -10,6 +10,22 @@
     "stats": "數據",
     "language": "語言"
   },
+  "guide": {
+    "title": "使用步驟",
+    "subtitleNoImage": "先上傳圖片，再依序完成 背景 -> 元素 -> 影片。",
+    "subtitleWithImage": "建議依序完成背景、元素和影片設定，減少來回切換。",
+    "current": "目前面板",
+    "openPanelHint": "可從底部導覽切換到要編輯的面板。",
+    "uploadTitle": "上傳圖片",
+    "uploadDesc": "先放入主圖，頁面才會顯示完整的編輯與導出功能。",
+    "backgroundTitle": "調整背景",
+    "backgroundDesc": "先確定排版、色塊比例與底圖樣式，再調元素會更順手。",
+    "exportTitle": "導出內容",
+    "exportDesc": "最後選擇動畫模板，再決定導出 PNG 或影片。",
+    "panelBackgroundDesc": "這裡負責版式、色塊區域與背景樣式，是整個作品的基礎層。",
+    "panelElementsDesc": "這裡負責形狀、疊字與元素分布，建議在背景確定後再細調。",
+    "panelVideoDesc": "這裡負責動畫模板與影片導出，適合在靜態畫面滿意後最後處理。"
+  },
   "stats": {
     "title": "數據分析",
     "visits": "訪問",
@@ -142,11 +158,36 @@
     "png": "導出 PNG",
     "video": "導出影片",
     "generating": "正在生成...",
-    "download": "下載"
+    "download": "下載",
+    "videoUnsupported": "目前瀏覽器缺少影片錄製能力，無法直接導出影片。"
   },
   "video": {
     "ready": "影片已準備就緒",
-    "exportSuccess": "導出成功！"
+    "exportSuccess": "導出成功！",
+    "exportActionsHint": "你可以直接下載、先預覽一次，或明確存到本機檔案。",
+    "downloadNow": "導出並下載",
+    "previewResult": "導出後預覽",
+    "saveToLocal": "導出到本機檔案",
+    "backToEditor": "返回編輯器",
+    "localSaveUnsupported": "目前瀏覽器不支援直接存到本機檔案，請改用下載或預覽。",
+    "localSaveFailed": "存到本機檔案失敗，請再試一次。",
+    "downloadBlocked": "目前瀏覽器攔截了下載動作，請改用本機儲存或預覽。",
+    "previewBlocked": "目前瀏覽器攔截了影片預覽，請改用下載或本機儲存。"
+  },
+  "imageExport": {
+    "prepareButton": "生成 PNG",
+    "prepareHint": "先生成，再選擇儲存方式",
+    "ready": "PNG 已準備就緒",
+    "success": "導出成功！",
+    "actionsHint": "點擊下面的按鈕直接下載 PNG。",
+    "downloadNow": "直接下載 PNG",
+    "previewResult": "導出後預覽",
+    "saveToLocal": "導出到本機檔案",
+    "backToEditor": "返回編輯器",
+    "localSaveUnsupported": "目前瀏覽器不支援直接存到本機檔案，請改用下載或預覽。",
+    "localSaveFailed": "存 PNG 到本機檔案失敗，請再試一次。",
+    "downloadBlocked": "目前瀏覽器攔截了 PNG 下載，請改用本機儲存或預覽。",
+    "previewBlocked": "目前瀏覽器攔截了 PNG 預覽，請改用下載或本機儲存。"
   },
   "text": {
     "addText": "添加文字",
@@ -170,6 +211,7 @@
   "background": {
     "layout": "排版模式",
     "colorRatio": "色塊佔比",
+    "colorRatioHint": "只會改變色塊區域寬窄，主圖預覽尺寸不變；匯出效果與預覽一致。",
     "bgType": "背景類型",
     "color": "顏色",
     "gradient": "漸變",
@@ -178,8 +220,13 @@
     "animation": "動畫",
     "position": "位置",
     "stripeWidth": "條紋寬度",
+<<<<<<< HEAD
     "stripeWidthHint": "調色塊 20%–80%; 預覽=導出",
+=======
+    "stripeWidthHint": "調整雙拼背景中條紋的寬度，數值越大條紋越寬。",
+>>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "圖案密度",
+    "patternDensityHint": "調整格線、棋盤格與點陣背景的圖案疏密，數值越大圖案越粗。",
     "gradientAngle": "漸變角度",
     "bgImage": "背景圖片",
     "changeImage": "更換圖片",
