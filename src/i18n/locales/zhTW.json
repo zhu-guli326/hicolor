@@ -220,11 +220,7 @@
     "animation": "動畫",
     "position": "位置",
     "stripeWidth": "條紋寬度",
-<<<<<<< HEAD
-    "stripeWidthHint": "調色塊 20%–80%; 預覽=導出",
-=======
     "stripeWidthHint": "調整雙拼背景中條紋的寬度，數值越大條紋越寬。",
->>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "圖案密度",
     "patternDensityHint": "調整格線、棋盤格與點陣背景的圖案疏密，數值越大圖案越粗。",
     "gradientAngle": "漸變角度",

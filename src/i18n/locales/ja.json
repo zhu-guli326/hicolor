@@ -220,11 +220,7 @@
     "animation": "アニメーション",
     "position": "位置",
     "stripeWidth": "ストライプ幅",
-<<<<<<< HEAD
-    "stripeWidthHint": "色ブロック調整 20%–80%; プレビュー = エクスポート",
-=======
     "stripeWidthHint": "分割背景のストライプ幅を調整します。値が大きいほどストライプが太くなります。",
->>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "パターン密度",
     "patternDensityHint": "グリッド、チェッカーボード、ドット背景の密度と太さを調整します。値が大きいほどパターンが強く見えます。",
     "gradientAngle": "グラデーション角度",

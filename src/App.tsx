@@ -2533,24 +2533,10 @@ export default function App() {
     if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
     setVideoBlobUrl(null);
 
-<<<<<<< HEAD
-    // 临时启用动画播放状态，确保录制时能绘制动画效果
-    const previousIsPlaying = isPlaying;
-
-    try {
-      // 确保 FFmpeg 已加载
-      if (!ffmpegRef.current) {
-        setExportError('FFmpeg 正在加载中，请稍后重试');
-        setIsExporting(false);
-        return;
-      }
-
-=======
     const previousIsPlaying = isPlaying;
 
     try {
       // 临时启用动画播放状态，确保录制时能绘制动画效果
->>>>>>> b26b5f2 (Improve export flows and editor UX)
       setIsPlaying(true);
 
       // 等待一帧，确保动画状态生效
@@ -4718,11 +4704,7 @@ export default function App() {
                     className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
                   />
                   <p className="text-[8px] font-bold text-gray-400 leading-snug">
-<<<<<<< HEAD
-                    {t('stripeWidthHint')}
-=======
                     {t('background.colorRatioHint')}
->>>>>>> b26b5f2 (Improve export flows and editor UX)
                   </p>
                 </div>
               </div>

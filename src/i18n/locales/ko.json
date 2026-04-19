@@ -220,11 +220,7 @@
     "animation": "애니메이션",
     "position": "위치",
     "stripeWidth": "스트라이프 폭",
-<<<<<<< HEAD
-    "stripeWidthHint": "색 블록 조정 20%–80%; 프리뷰 = 내보내기",
-=======
     "stripeWidthHint": "분할 배경의 스트라이프 너비를 조절합니다. 값이 클수록 스트라이프가 더 넓어집니다.",
->>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "패턴 밀도",
     "patternDensityHint": "그리드, 체커보드, 도트 배경의 패턴 간격과 굵기를 조절합니다. 값이 클수록 패턴이 더 굵어집니다.",
     "gradientAngle": "그라데이션 각도",

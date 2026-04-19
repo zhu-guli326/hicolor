@@ -74,11 +74,7 @@
     "animation": "Animation",
     "position": "Position",
     "stripeWidth": "Stripe Width",
-<<<<<<< HEAD
-    "stripeWidthHint": "Adjust color block 20%–80%; preview = export",
-=======
     "stripeWidthHint": "Controls the stripe width in split backgrounds. Larger values create wider stripes.",
->>>>>>> b26b5f2 (Improve export flows and editor UX)
     "patternDensity": "Pattern Density",
     "patternDensityHint": "Controls the spacing and weight of grid, checkerboard, and dot patterns. Larger values create bolder patterns.",
     "gradientAngle": "Gradient Angle",
@@ -244,11 +240,7 @@
     "off": "Off",
     "regenerate": "Regenerate",
     "clear": "Clear",
-<<<<<<< HEAD
-    "collapse": "Collapse Settings"
-=======
     "collapse": "Collapse settings panel"
->>>>>>> b26b5f2 (Improve export flows and editor UX)
   },
   "languages": {
     "zh": "简体中文",
