@@ -11,7 +11,20 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { useStats } from './hooks/useStats';
 import { useEnhancedAnalytics } from './hooks/useAnalytics';
-import { useI18n, type Locale, LOCALE_LABELS } from './i18n/index';
+import { useI18n } from './i18n/index';
+import { AppHeader } from './components/AppHeader';
+import { BottomNav } from './components/BottomNav';
+import {
+  BATCH_FRAME_MS,
+  BATCH_PROGRESS_STEP,
+  BATCH_SWITCHES_PER_SECOND,
+  PULSE_REVEAL_INTERVAL_MS,
+  RAIN_ICON_SCALE,
+  RAIN_SPEED_MULTIPLIER,
+  renderBatchSceneTransition,
+  resolveNonOverlappingCutoutPlacements,
+} from './features/animations/batchScene';
+import { extractDominantImageColors } from './utils/colorExtraction';
 import {
   Upload,
   RefreshCw,
@@ -51,7 +64,6 @@ import {
   Loader2,
   BarChart3,
   RotateCcw,
-  Globe,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -746,31 +758,9 @@ function addShapePath(ctx: CanvasRenderingContext2D, kind: ShapeKind, size: numb
   }
 }
 
-type BatchBaseShape = 'circle' | 'square' | 'star' | 'heart' | 'drop' | 'snowflake';
-
-const BATCH_SHAPE_SEQUENCE: BatchBaseShape[] = ['circle', 'square', 'star', 'drop', 'snowflake', 'heart'];
-const BATCH_SWITCHES_PER_SECOND = 2.8;
-const BATCH_FRAME_MS = 1000 / 30;
-const BATCH_PROGRESS_STEP = (BATCH_FRAME_MS / 1000) * BATCH_SWITCHES_PER_SECOND;
-
-function easeInOutCubic(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-function getBatchShapeSignature(step: number, index: number) {
-  const seed = step * 97 + index * 37;
-  const normalizedIndex = ((seed % BATCH_SHAPE_SEQUENCE.length) + BATCH_SHAPE_SEQUENCE.length) % BATCH_SHAPE_SEQUENCE.length;
-  return {
-    shape: BATCH_SHAPE_SEQUENCE[normalizedIndex],
-    angle: ((seed * 23.417) % 360) * (Math.PI / 180),
-    offsetX: Math.sin(seed * 0.61) * 0.72,
-    offsetY: Math.cos(seed * 0.47) * 0.72,
-  };
-}
-
-function drawBatchMorphShape(
+function drawBatchSceneShape(
   ctx: CanvasRenderingContext2D,
-  shape: BatchBaseShape,
+  shape: 'circle' | 'square' | 'star' | 'heart' | 'drop' | 'snowflake',
   size: number
 ) {
   if (shape === 'circle') {
@@ -788,131 +778,6 @@ function drawBatchMorphShape(
   ctx.beginPath();
   addShapePath(ctx, shape, size);
   ctx.fill();
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function getBatchSceneVisibleCutouts(cutouts: Cutout[], sceneStep: number) {
-  if (cutouts.length === 0) return [];
-
-  const maxCount = Math.min(12, cutouts.length);
-  const minCount = Math.min(4, maxCount);
-  const span = Math.max(1, maxCount - minCount + 1);
-  const visibleCount = minCount + (((sceneStep * 3) % span) + span) % span;
-  const startIndex = (((sceneStep * 2) % cutouts.length) + cutouts.length) % cutouts.length;
-
-  return Array.from({ length: visibleCount }, (_, i) => cutouts[(startIndex + i) % cutouts.length]);
-}
-
-function renderBatchScene(
-  ctx: CanvasRenderingContext2D,
-  cutouts: Cutout[],
-  sceneStep: number,
-  phase: number,
-  sampleColor: (x: number, y: number) => string,
-  cutoutConfig: {
-    baseSize: number;
-    variation: number;
-  },
-  width: number,
-  height: number
-) {
-  const scenePulse = 0.94 + Math.sin(phase * Math.PI * 2) * 0.06;
-  const placements: Array<{
-    centerX: number;
-    centerY: number;
-    size: number;
-    cutout: Cutout;
-    signature: ReturnType<typeof getBatchShapeSignature>;
-  }> = [];
-  const visibleCutouts = getBatchSceneVisibleCutouts(cutouts, sceneStep);
-  const sceneShiftX = Math.sin(sceneStep * 0.83) * width * 0.08;
-  const sceneShiftY = Math.cos(sceneStep * 0.67) * height * 0.08;
-
-  ctx.save();
-  visibleCutouts.forEach((cutout, index) => {
-    const signature = getBatchShapeSignature(sceneStep, index);
-    const size =
-      (cutoutConfig.baseSize + cutout.sizeFactor * cutoutConfig.variation * 10) *
-      (width / 800) *
-      1.22 *
-      scenePulse;
-
-    let centerX = cutout.x * width + sceneShiftX + signature.offsetX * size;
-    let centerY = cutout.y * height + sceneShiftY + signature.offsetY * size;
-
-    const minX = size * 0.6;
-    const maxX = width - size * 0.6;
-    const minY = size * 0.6;
-    const maxY = height - size * 0.6;
-
-    let placed = false;
-    for (let attempt = 0; attempt < 18 && !placed; attempt++) {
-      centerX = clamp(centerX, minX, maxX);
-      centerY = clamp(centerY, minY, maxY);
-
-      let overlaps = false;
-      for (const existing of placements) {
-        const dx = centerX - existing.centerX;
-        const dy = centerY - existing.centerY;
-        const minDist = (size + existing.size) * 0.68;
-        if (dx * dx + dy * dy < minDist * minDist) {
-          overlaps = true;
-          const angle = ((sceneStep + 1) * (index + 3) * (attempt + 1) * 0.73) % (Math.PI * 2);
-          const push = minDist * (0.94 + attempt * 0.12);
-          centerX += Math.cos(angle) * push;
-          centerY += Math.sin(angle) * push;
-          break;
-        }
-      }
-
-      if (!overlaps) placed = true;
-    }
-
-    centerX = clamp(centerX, minX, maxX);
-    centerY = clamp(centerY, minY, maxY);
-    placements.push({ centerX, centerY, size, cutout, signature });
-
-    const color = sampleColor(cutout.x, cutout.y);
-
-    ctx.save();
-    ctx.translate(centerX, centerY);
-    ctx.rotate(signature.angle);
-    ctx.fillStyle = color;
-    drawBatchMorphShape(ctx, signature.shape, size);
-    ctx.restore();
-  });
-  ctx.restore();
-}
-
-function renderBatchSceneTransition(
-  ctx: CanvasRenderingContext2D,
-  cutouts: Cutout[],
-  phase: number,
-  sampleColor: (x: number, y: number) => string,
-  cutoutConfig: {
-    baseSize: number;
-    variation: number;
-  },
-  width: number,
-  height: number
-) {
-  const step = Math.floor(phase);
-  const localPhase = phase - step;
-  const activeStep = localPhase < 0.5 ? step : step + 1;
-  const scenePulse = localPhase < 0.5 ? localPhase * 2 : (1 - localPhase) * 2;
-  renderBatchScene(
-    ctx,
-    cutouts,
-    activeStep,
-    easeInOutCubic(scenePulse),
-    sampleColor,
-    cutoutConfig,
-    width,
-    height
-  );
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -2042,7 +1907,7 @@ export default function App() {
           }
           return prev + 1;
         });
-      }, 250); // 每0.25秒增加1个
+      }, PULSE_REVEAL_INTERVAL_MS); // 更快地逐个显现
     }
     return () => clearInterval(interval);
   }, [activeAnimation, isPlaying]);
@@ -2064,7 +1929,8 @@ export default function App() {
             setRainfallPhase(1);
             return 0;
           }
-          return prev + 0.01; // 缓慢下落
+          const step = activeAnimation === 'rain' ? 0.01 * RAIN_SPEED_MULTIPLIER : 0.01;
+          return prev + step; // 缓慢下落
         });
         
         // 0.5秒后进入下落阶段
@@ -2963,17 +2829,19 @@ export default function App() {
 
           if (activeAnimation === 'rain' || activeAnimation === 'rainfall') {
             const raindropCount = lightweightExportEffects ? 18 : 40;
+            const rainScale = activeAnimation === 'rain' ? RAIN_ICON_SCALE : 1;
+            const rainSpeed = activeAnimation === 'rain' ? RAIN_SPEED_MULTIPLIER : 1;
             for (let i = 0; i < raindropCount; i++) {
               const rx = (mainW / raindropCount) * i + mainW / (raindropCount * 2);
-              const rainY = mainH * rainfallVal + i * (mainH / raindropCount);
+              const rainY = mainH * Math.min(1, rainfallVal * rainSpeed) + i * (mainH / raindropCount);
               if (rainY < 0 || rainY >= mainH) continue;
               const rc = sampleFromBlockData(rx / mainW, rainY / mainH);
               ctx.fillStyle = rc;
               if (lightweightExportEffects) {
-                ctx.fillRect(rx - 2, rainY - 8, 4, 16);
+                ctx.fillRect(rx - 2 * rainScale, rainY - 8 * rainScale, 4 * rainScale, 16 * rainScale);
               } else {
                 ctx.beginPath();
-                ctx.ellipse(rx, rainY, 3, 10, 0, 0, Math.PI * 2);
+                ctx.ellipse(rx, rainY, 3 * rainScale, 10 * rainScale, 0, 0, Math.PI * 2);
                 ctx.fill();
               }
             }
@@ -3057,15 +2925,16 @@ export default function App() {
 
           if (activeAnimation === 'batch') {
             const batchPhase = batchVal * (DURATION / 1000) * BATCH_SWITCHES_PER_SECOND;
-            renderBatchSceneTransition(
+            renderBatchSceneTransition({
               ctx,
               cutouts,
-              batchPhase,
-              sampleFromBlockData,
-              { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
-              mainW,
-              mainH
-            );
+              phase: batchPhase,
+              sampleColor: sampleFromBlockData,
+              cutoutConfig: { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
+              width: mainW,
+              height: mainH,
+              drawShape: drawBatchSceneShape,
+            });
           }
         }
       }
@@ -3273,6 +3142,16 @@ export default function App() {
         return false;
       }
     }
+  };
+
+  const applyImageDominantColors = () => {
+    if (!image) return;
+    const { primary, secondary } = extractDominantImageColors(image);
+    setBgConfig((prev) => ({
+      ...prev,
+      color1: primary,
+      color2: secondary,
+    }));
   };
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -3716,28 +3595,40 @@ export default function App() {
     // 3. 动画模式渲染：保持原图+色块，清空形状
     if (activeAnimation === 'batch' && isPlaying) {
       // 形状切换模式：整组场景一起切换，不做单个形状的变形过渡
-      renderBatchSceneTransition(
-        mainCtx,
+      renderBatchSceneTransition({
+        ctx: mainCtx,
         cutouts,
-        batchPositionOffset,
-        sampleFromBlockData,
-        { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
-        mainW,
-        mainH
-      );
+        phase: batchPositionOffset,
+        sampleColor: sampleFromBlockData,
+        cutoutConfig: { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
+        width: mainW,
+        height: mainH,
+        drawShape: drawBatchSceneShape,
+      });
     } else if (activeAnimation === 'pulse' && isPlaying) {
       // 形状叠加模式：每个节拍只新增一个形状
       const rawCount = Math.floor(pulseRevealCount);
       const visibleCount = Math.min(20, Math.max(0, rawCount));
+      const placements = resolveNonOverlappingCutoutPlacements({
+        cutouts,
+        width: mainW,
+        height: mainH,
+        baseSize: cutoutConfig.baseSize,
+        variation: cutoutConfig.variation,
+        limit: visibleCount,
+        sceneStep: 1,
+      });
       
       // 绘制逐个叠加的形状
       for (let i = 0; i < visibleCount && i < cutouts.length; i++) {
         const c = cutouts[i];
-        const baseSize = (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (mainW / 800);
+        const placement = placements[i];
+        if (!placement) continue;
+        const baseSize = placement.size;
         const holeColor = sampleFromBlockData(c.x, c.y);
         
         mainCtx.save();
-        mainCtx.translate(c.x * mainW, c.y * mainH);
+        mainCtx.translate(placement.centerX, placement.centerY);
         mainCtx.rotate(c.angle + pulseRevealCount * 0.1);
         mainCtx.fillStyle = holeColor;
         
@@ -3798,7 +3689,7 @@ export default function App() {
         const seed = i * 0.1;
         const baseX = (Math.sin(seed * 3.7) * 0.5 + 0.5);
         const baseY = (Math.cos(seed * 2.3) * 0.5 + 0.5);
-        const speed = 0.3 + (Math.sin(seed * 5.1) * 0.5 + 0.5) * 0.7;
+        const speed = (0.3 + (Math.sin(seed * 5.1) * 0.5 + 0.5) * 0.7) * RAIN_SPEED_MULTIPLIER;
         
         // 当前雨滴的位置（基于进度）
         const dropProgress = (disappearProgress * speed) % 1;
@@ -3817,7 +3708,7 @@ export default function App() {
         if (currentY < 1.1 && 1 - disappearProgress > 0) {
           const x = baseX * mainW;
           const y = currentY * mainH;
-          const dropSize = 4 + Math.sin(seed * 7) * 2;
+          const dropSize = (4 + Math.sin(seed * 7) * 2) * RAIN_ICON_SCALE;
           
           mainCtx.globalAlpha = (1 - disappearProgress) * 0.8;
           mainCtx.beginPath();
@@ -3936,23 +3827,41 @@ export default function App() {
     
     // 动画模式：形状用纯色填充（孔洞露出色块）
     if (activeAnimation === 'batch' && isPlaying) {
-      renderBatchSceneTransition(
-        blockCtx,
+      renderBatchSceneTransition({
+        ctx: blockCtx,
         cutouts,
-        batchPositionOffset,
-        () => cutoutConfig.shapeColor,
-        { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
-        blockW,
-        blockH
-      );
+        phase: batchPositionOffset,
+        sampleColor: () => cutoutConfig.shapeColor,
+        cutoutConfig: { baseSize: cutoutConfig.baseSize, variation: cutoutConfig.variation },
+        width: blockW,
+        height: blockH,
+        drawShape: drawBatchSceneShape,
+      });
     } else if ((activeAnimation === 'pulse' || activeAnimation === 'stars' || activeAnimation === 'rain' || activeAnimation === 'rainfall') && isPlaying) {
       // 绘制形状（纯色填充，形状孔洞露出色块背景）
-      cutouts.forEach((c) => {
+      const pulseVisibleCount =
+        activeAnimation === 'pulse' ? Math.min(20, Math.max(0, Math.floor(pulseRevealCount))) : cutouts.length;
+      const placements =
+        activeAnimation === 'pulse'
+          ? resolveNonOverlappingCutoutPlacements({
+              cutouts,
+              width: blockW,
+              height: blockH,
+              baseSize: cutoutConfig.baseSize,
+              variation: cutoutConfig.variation,
+              limit: pulseVisibleCount,
+              sceneStep: 1,
+            })
+          : [];
+
+      cutouts.slice(0, pulseVisibleCount).forEach((c, index) => {
         const currentSize =
-          (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) *
-          (blockW / 800);
+          activeAnimation === 'pulse'
+            ? placements[index]?.size ?? (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (blockW / 800)
+            : (cutoutConfig.baseSize + c.sizeFactor * cutoutConfig.variation * 10) * (blockW / 800);
+        const placement = activeAnimation === 'pulse' ? placements[index] : null;
         blockCtx.save();
-        blockCtx.translate(c.x * blockW, c.y * blockH);
+        blockCtx.translate(placement ? placement.centerX : c.x * blockW, placement ? placement.centerY : c.y * blockH);
         blockCtx.rotate(c.angle);
         if (isGlyphShapeKind(c.shapeKind)) {
           const char = cutoutGlyphChar(c, cutoutConfig.customShapeSymbol);
@@ -4721,100 +4630,6 @@ export default function App() {
     );
   };
 
-  const renderTabButton = (id: BottomNavTab, icon: React.ReactNode, label: string) => (
-    <button
-      type="button"
-      onClick={() => setActiveTab(activeTab === id ? null : id)}
-      className={`flex-1 flex flex-col items-center py-3 space-y-1 transition-all relative ${
-        activeTab === id ? 'text-green-600' : 'text-gray-400 hover:text-gray-600'
-      }`}
-    >
-      {icon}
-      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
-      {id === 'video' && (
-        <span className="text-[7px] font-bold text-gray-400">Beta</span>
-      )}
-      {activeTab === id && (
-        <motion.div layoutId="tab-indicator" className="absolute bottom-0 w-8 h-1 bg-green-500 rounded-t-full" />
-      )}
-    </button>
-  );
-
-  const [showLangMenu, setShowLangMenu] = useState(false);
-
-  const renderHeader = () => (
-    <header className="fixed top-0 left-0 right-0 z-50 flex min-h-14 items-center justify-between border-b border-gray-100 bg-white/80 px-3 pt-[max(0px,env(safe-area-inset-top))] pb-2 backdrop-blur-xl sm:min-h-16 sm:px-6 sm:pb-0">
-      <div className="flex items-center">
-        <a
-          href="https://www.xiaohongshu.com/user/profile/57b3456c82ec3947f79496e9"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-lg font-black tracking-tighter text-gray-900 italic leading-none sm:text-xl hover:text-emerald-600 transition-colors cursor-pointer"
-          title="访问小红书"
-        >
-          hicolor
-        </a>
-      </div>
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        {/* 语言切换 */}
-        <div className="relative">
-          <button
-            onClick={() => setShowLangMenu(v => !v)}
-            className="rounded-full bg-gray-50 p-2 text-gray-600 transition-all hover:bg-gray-100 active:scale-90"
-            title={t('nav.language')}
-          >
-            <Globe size={18} />
-          </button>
-          {showLangMenu && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />
-              <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 min-w-[140px]">
-                {(Object.entries(LOCALE_LABELS) as [Locale, string][]).map(([l, label]) => (
-                  <button
-                    key={l}
-                    onClick={() => { setLocale(l); setShowLangMenu(false); }}
-                    className={`w-full text-left px-4 py-2 text-[13px] font-bold transition-colors ${
-                      locale === l ? 'text-emerald-600 bg-emerald-50' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        <label
-          htmlFor="main-image-upload"
-          className="cursor-pointer rounded-full bg-gray-50 p-2 text-gray-600 transition-all hover:bg-gray-100 active:scale-90 sm:p-2.5"
-          title={t('upload.title')}
-        >
-          <Upload size={20} />
-        </label>
-        {image && (
-          <button
-            onClick={handleSave}
-            className="group flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-700 active:scale-95 sm:gap-2 sm:px-6 sm:py-2.5"
-            title={t('export.download')}
-          >
-            <Download size={18} className="transition-transform group-hover:translate-y-0.5 sm:size-5" />
-            <span className="text-[11px] font-black uppercase tracking-widest sm:text-[13px]">{t('export.png')}</span>
-          </button>
-        )}
-      </div>
-    </header>
-  );
-
-  const renderBottomNav = () => (
-    <nav ref={bottomNavRef} className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl border-t border-gray-100 pb-safe z-50">
-      <div className="flex justify-around items-center h-14 px-4">
-        {renderTabButton('background', <Palette size={22} />, t('nav.background'))}
-        {renderTabButton('elements', <Target size={22} />, t('nav.elements'))}
-        {renderTabButton('video', <Video size={22} />, t('nav.video'))}
-      </div>
-    </nav>
-  );
-
   const panelMeta = activeTab === 'background'
     ? {
         title: t('nav.background'),
@@ -4984,6 +4799,16 @@ export default function App() {
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                     {bgConfig.type === 'solid' ? t('background.color') : t('background.color')}
                   </label>
+                  {image && (
+                    <button
+                      type="button"
+                      onClick={applyImageDominantColors}
+                      className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 transition-colors hover:bg-emerald-100"
+                    >
+                      <Sparkles size={12} />
+                      <span>Pick Main Colors</span>
+                    </button>
+                  )}
                   <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0 space-y-0.5">
                       {bgConfig.type !== 'solid' && (
@@ -5917,7 +5742,15 @@ export default function App() {
           <feBlend in="SourceGraphic" in2="lightNoise" mode="overlay" />
         </filter>
       </svg>
-      {renderHeader()}
+      <AppHeader
+        image={image}
+        locale={locale}
+        setLocale={setLocale}
+        onSave={handleSave}
+        uploadTitle={t('upload.title')}
+        languageTitle={t('nav.language')}
+        exportLabel={t('export.png')}
+      />
       
       <main
         className={`fixed inset-0 overflow-hidden pb-16 pt-14 flex items-center justify-center sm:pt-16 ${
@@ -6130,7 +5963,7 @@ export default function App() {
                           initial={{ y: -20, opacity: 0 }}
                           animate={{ y: 800, opacity: [0, 1, 1, 0] }}
                           transition={{
-                            duration: drop.duration,
+                            duration: drop.duration / RAIN_SPEED_MULTIPLIER,
                             delay: drop.delay,
                             repeat: Infinity,
                             ease: "linear"
@@ -6141,7 +5974,7 @@ export default function App() {
                             top: 0,
                           }}
                         >
-                          <DropSVG size={12} style={{ color: dropColor }} />
+                          <DropSVG size={12 * RAIN_ICON_SCALE} style={{ color: dropColor }} />
                         </motion.div>
                       );
                     })}
@@ -6383,7 +6216,16 @@ export default function App() {
       </main>
 
       {renderSettingsPanel()}
-      {renderBottomNav()}
+      <BottomNav
+        ref={bottomNavRef}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        labels={{
+          background: t('nav.background'),
+          elements: t('nav.elements'),
+          video: t('nav.video'),
+        }}
+      />
 
       {/* 导出视频弹窗 */}
       <AnimatePresence>
